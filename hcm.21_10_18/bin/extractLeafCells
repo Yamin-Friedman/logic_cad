@@ -1,0 +1,29 @@
+#!/usr/bin/perl
+
+my $nAdded = 0;
+sub parseFile($) 
+{
+    my $fn = shift;
+    open(F, "<$fn");
+    while (my $line = <F>) {
+	if ($line =~ m/^\s*module\s+([^\s\(]+)/) {
+	    $MODS{$1} = 1;
+	} elsif ($line =~ m/^\s*([^\s\.\(]+)\s+[^\s\(]+\s*([\(].*)/) {
+	    my ($master,$inst) = ($1,$2);
+	    $MASTERS{$master} = $inst;
+	}
+    }
+    close(F);
+} 
+
+foreach my $f (@ARGV) {
+#    print STDERR "Parsing $f\n";
+    parseFile($f);
+}
+
+# write down all masters without a template
+foreach my $master (keys(%MASTERS)) {
+    if (!defined($MODS{$master})) {
+	print STDERR "$master $MASTERS{$master}\n";
+    }
+}

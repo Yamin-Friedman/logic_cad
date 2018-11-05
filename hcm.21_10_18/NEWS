@@ -1,0 +1,16 @@
+15 Aug 2015:
+  Add vcd library to ease on Wet02 Wet03. 
+  See vcd/hcmvcd.h.
+
+31 Mar 2015: 
+  Fix a bug in flat.cc: cause wrong node name when 
+  Top level node has no port. Underrun in context
+  lookup.
+
+  Fix a bug in hcm.h: missing instPort getInstance(). 
+  Since the code actually defines getInst() instead,
+  Remove getInstance()
+
+4 Mar 2015:
+  Add Flattener directory and code. As an example 
+  tool.

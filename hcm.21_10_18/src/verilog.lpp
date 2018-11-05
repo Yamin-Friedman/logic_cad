@@ -1,0 +1,200 @@
+
+%{
+/*
+
+
+#define SELFDEBUG
+#define DEBUG
+*/
+#include <stdio.h>
+#include <strings.h>
+#include "hcm.h"
+#include "verilog.tab.hpp"
+extern YYSTYPE vlog_lval;
+//int vlog_lineno=1;
+
+%}
+
+%x CMT
+%x PROP
+
+NAME		[^ #(),\t\n]+
+COMMENT 	"//"[^\n]*\n
+
+%%
+
+"`".*\n|{COMMENT}          {
+        		#ifdef DEBUG 
+			printf("COMMENT\n");
+ 			#endif		
+   			vlog_lineno++;
+                        if(vlog_lineno % 10000==0) 
+                           fprintf(stderr,"Parsing Verilog file for %d lines ...    \r",vlog_lineno);   
+                      }
+"/*"		{ BEGIN CMT;}
+<CMT>"*/"		{ BEGIN INITIAL;}
+<CMT>.
+<CMT>\n		{ vlog_lineno++;
+                          if(vlog_lineno % 10000==0) 
+                           fprintf(stderr,"Parsing Verilog file for %d lines ...    \r",vlog_lineno);   
+                        }
+[1-9][0-9]*"'"[bhd][0-9a-fA-FxXzZ]+ { 
+                        #ifdef DEBUG
+ 			printf("INT=%s ",vlog_text);
+ 			#endif
+			vlog_lval.sval=strdup(vlog_text);
+                        return CONST;
+                        }
+
+
+("-"|"+")?([1-9][0-9]*|"0")      { 
+                        #ifdef DEBUG
+ 			printf("INT=%s ",vlog_text);
+ 			#endif
+			vlog_lval.ival=atol(vlog_text);
+                        return INT;
+                        }
+
+":"|"."|"{"|"}"|"["|"]"|","|"*"|";"|"="|"-"|"+"|"|"|"("|")"	{
+                        #ifdef DEBUG 
+                        printf("%c ",vlog_text[0]);
+                        #endif
+			return ((int) vlog_text[0]);
+			}
+
+module		{
+		#ifdef DEBUG
+		printf("MODULE ");
+		#endif
+		vlog_lval.ival=MODULE;
+		return MODULE;
+		}
+endmodule		{
+		#ifdef DEBUG
+		printf("ENDMODULE ");
+		#endif
+		vlog_lval.ival=ENDMODULE;
+		return ENDMODULE;
+		}
+wire		{
+		#ifdef DEBUG
+		printf("WIRE ");
+		#endif
+		vlog_lval.ival=WIRE;
+		return WIRE;
+		}
+wand		{
+		#ifdef DEBUG
+		printf("WAND ");
+		#endif
+		vlog_lval.ival=WAND;
+		return WAND;
+		}
+wor		{
+		#ifdef DEBUG
+		printf("WOR ");
+		#endif
+		vlog_lval.ival=WOR;
+		return WOR;
+		}
+tri		{
+		#ifdef DEBUG
+		printf("TRI ");
+		#endif
+		vlog_lval.ival=TRI;
+		return TRI;
+		}
+
+reg		{
+		#ifdef DEBUG
+		printf("REG ");
+		#endif
+		vlog_lval.ival=REG;
+		return REG;
+		}
+trireg		{
+		#ifdef DEBUG
+		printf("TRIREG ");
+		#endif
+		vlog_lval.ival=TRIREG;
+		return TRIREG;
+		}
+input		{
+		#ifdef DEBUG
+		printf("INPUT ");
+		#endif
+		vlog_lval.ival=INPUT;
+		return INPUT;
+		}
+output		{
+		#ifdef DEBUG
+		printf("OUTPUT ");
+		#endif
+		vlog_lval.ival=OUTPUT;
+		return OUTPUT;
+		}
+inout		{
+		#ifdef DEBUG
+		printf("INOUT ");
+		#endif
+		vlog_lval.ival=INOUT;
+		return INOUT;
+		}
+supply1		{
+		#ifdef DEBUG
+		printf("SUPPLY1 ");
+		#endif
+		vlog_lval.ival=SUPPLY1;
+		return SUPPLY1;
+		}
+supply0		{
+		#ifdef DEBUG
+		printf("SUPPLY0 ");
+		#endif
+		vlog_lval.ival=SUPPLY0;
+		return SUPPLY0;
+		}
+assign		{
+		vlog_lval.ival=_ASSIGN;
+		return _ASSIGN;
+		}
+
+buf		{
+		vlog_lval.ival=BUF;
+		return BUF;
+		}
+
+\\[^ \t\n]+|[A-Za-z_/][/A-Za-z0-9_.]* {
+                        if(vlog_text[0] == '\\')
+                           vlog_lval.sval = (char*)new_string(vlog_text+1);
+                        else
+                           vlog_lval.sval = (char*)new_string(vlog_text);
+            		#ifdef DEBUG
+ 			printf("ID=%s ",vlog_lval.sval);
+			#endif
+			return (ID);
+			}
+
+\n			{
+                           vlog_lineno++;
+                           if(vlog_lineno % 10000==0) 
+                              fprintf(stderr,"Parsing Verilog file for %d lines ...    \r",vlog_lineno);   
+                        }
+.			;
+
+%%
+
+int vlog_wrap ()
+   {
+   return (1);
+   }
+
+#ifdef SELFDEBUG
+main()
+{
+   int t;
+   while(t=vlog_lex()){
+      printf("%d ",t);
+   }
+}
+#endif

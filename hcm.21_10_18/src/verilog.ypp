@@ -1,0 +1,427 @@
+/*
+
+Simple Structural Verilog Parser 
+
+*/
+
+%{
+#define IMPLICIT_WIRES 1
+
+#include <stdio.h>
+#include "string.h"
+#include <sstream>
+#include <vector>
+#include <list>
+#include "hcm.h"
+#include "verilog.tab.hpp"
+
+#ifdef VLOG_MAIN
+CharBuf token;
+#endif
+
+//#define DEBUG 1
+#define VDD 1
+#define VSS 0
+#define YYMAXDEPTH 65536*1024
+void record_type(int x);
+
+
+%}
+
+%union{
+    int ival;
+    char *sval;
+    hcmInstance *instance;
+    hcmCell  *cell;
+    hcmInstPort *sym_pin;
+}
+
+%token INT ID MODULE ENDMODULE CONST _ASSIGN BUF
+%token WIRE WAND WOR TRI REG TRIREG INPUT OUTPUT INOUT SUPPLY1 SUPPLY0
+
+%type <sval> ID CONST
+%type <ival> type  WIRE WAND WOR TRI REG TRIREG INPUT OUTPUT INOUT SUPPLY1 SUPPLY0
+%type <cell> module0
+/* %type <sval> assign_stmt */
+%type <ival> INT
+%type <net> net_list
+%type <sym_pin> sym_pin_list sym_pin
+%type <instance> singleInst instName
+
+%start prog
+
+%{
+
+extern int vlog_lineno;
+hcmDesign         *global_design;
+hcmCell               *current_cell=NULL;
+static hcmInstance      *current_instance=NULL;
+static char moduleName[256];
+static char masterName[256];
+static char buff[1024];
+Range current_range;
+/* point to current port number for connect by order */
+int curPortIdx; 
+map< const hcmDesign *, map<string, vector<string> > > designCellPortsListMap;
+DictType dict;
+vector<hcmNode*> currentNodes;
+const char *current_file="";
+map<string, pair<int,int> > curCellBusses;
+void createInstance(const char *name);
+void add_new_bus(const char *name);
+void connectNodes(string portName);
+void connectNodesToNextPort();
+string busNodeName(string busName, int index);
+void pushBus(const char* busName, int leftIdx, int rightIdx);
+void pushBinaryBus(const char* binaryBusChar);
+extern int vlog_lex();
+
+int vlog_error(const char *msg)
+{
+   fprintf(stderr,"\nVerilog Syntax error at '%s' line %d (%s) ",current_file,vlog_lineno,msg);
+   delete current_cell;
+	current_cell = NULL;
+   return 1;
+}
+
+
+void print_each_net();
+%}
+%%
+
+prog: 
+   |  module {curCellBusses.clear();} prog {current_cell = NULL;} 
+   ;
+
+module0:
+      MODULE ID { 
+	           strcpy(moduleName, $2);
+                   $$=global_design->createCell($2);
+                   current_cell=$$;
+                }
+    ;
+
+module: 
+      module0 port_declaration ';' body  ENDMODULE  
+        { 
+           
+        }
+    ;
+
+body: 
+      declaration
+      | instance
+      | body declaration
+      | body instance
+     ;
+
+type_decl:
+     type '[' INT ':' INT ']'  { current_range.upper=$3; 
+                                 current_range.lower=$5; 
+				 current_range.type=WireNet;
+ 				 current_range.dir=NOT_PORT;
+                                 record_type((int)$1);
+                               }
+    |type                      { current_range.upper=-1; 
+                                 current_range.lower=-1; 
+                                 current_range.type=WireNet;
+ 				 current_range.dir=NOT_PORT;
+                                 record_type((int)$1);
+                               }
+    ;
+
+nodedeclaration: 
+       ID                        { add_new_bus($1);}
+    |  ID '[' INT ']'            { current_cell->createNode(busNodeName($1,$3));}
+    |  ID '[' INT ':' INT ']'    { current_cell->createBus($1,$3,$5,NOT_PORT);}
+    ;
+
+declaration:
+      type_decl assign_parameter_list ';'{  }
+    ;
+
+assign_parameter_list:            
+    nodedeclaration {} 
+    | assign_parameter_list ',' nodedeclaration   { } 
+    ;
+
+instName: ID {createInstance($1); $$=current_instance;} ;
+
+singleInst: instName '(' {curPortIdx = 0; } sym_pin_list ')' {$$=$1;}
+
+repeatedInsts: 
+    repeatedInsts ',' singleInst 
+    | singleInst 
+    ;
+
+master: ID { strcpy(masterName, $1);}
+    ;
+
+instance: master repeatedInsts ';';
+
+port_declaration:
+    | '(' ')' 
+    | '(' port_list ')'
+    ;
+
+port_list: 
+    ID                  { designCellPortsListMap[global_design][moduleName].push_back($1);}
+    | ID '[' INT ']'    { sprintf(buff, "%s[%d]",$1,$3); designCellPortsListMap[global_design][moduleName].push_back(buff);}
+    | port_list ',' ID  { designCellPortsListMap[global_design][moduleName].push_back($3);}
+    | port_list ',' ID '[' INT ']'  { sprintf(buff, "%s[%d]",$3,$5); 
+                                             designCellPortsListMap[global_design][moduleName].push_back(buff);}
+    ;
+
+net:   ID                        { pushBus($1,-1,-1);;}
+    |  ID '[' INT ']'            { pushBus($1,$3,$3);}
+    |  ID '[' INT ':' INT ']'    { pushBus($1,$3,$5);}
+    |  CONST                     { pushBinaryBus($1);}  
+    | '{' net_list '}'           
+    ; 
+
+net_list: net                    {} 
+    | net_list ',' net           {} 
+    ;
+ 
+sym_pin : {  currentNodes.clear(); } net                        { connectNodesToNextPort(); }
+    | '.' ID '(' ')'                 {  }
+    | '.' ID '(' {  currentNodes.clear(); } net ')'             { connectNodes($2);}
+    | '.' ID '[' INT ']' '(' ')'     { } 
+    | '.' ID '[' INT ']' '(' {  currentNodes.clear(); } net ')' { connectNodes(busNodeName($2,$4));} 
+    ;
+
+sym_pin_list:                    {}
+    | sym_pin                    { }
+    | sym_pin_list ',' sym_pin   { }
+    ;
+
+type: 
+    INPUT  {$$=INPUT;}
+    | OUTPUT {$$=OUTPUT;}
+    | INOUT  {$$=INOUT;}
+    | WIRE   {$$=WIRE;}
+    | WAND   {$$=WAND;}
+    | WOR    {$$=WOR;}
+    | TRI    {$$=TRI;}
+    | REG    {$$=REG;}
+    | SUPPLY1 {$$=SUPPLY1;}
+    | SUPPLY0 {$$=SUPPLY0;}
+    ;
+%%
+
+void record_type(int x){
+  if(x==INPUT){
+    current_range.dir=IN;
+  }else if(x==OUTPUT){
+    current_range.dir=OUT;
+  }else if(x==INOUT){
+    current_range.dir=IN_OUT;
+  }
+}
+
+void createInstance(const char *name) {
+  current_instance = current_cell->createInst(name,masterName);
+  if (!current_instance) {
+    fprintf(stderr,"\ncreateInstance: Failed to create instance: %s of master: %s in file %s line %d\n", name, masterName, current_file,vlog_lineno);
+    exit(1);
+  }
+}
+
+void add_new_bus(const char *name){
+  if(current_range.lower < 0) {
+    hcmNode* n = current_cell->getNode(name);
+    if (!n) {
+      n = current_cell->createNode(name);
+      if (!n) {
+	fprintf(stderr,"\nadd_new_bus: Failed to create node: %s in file %s line %d\n", name, current_file,vlog_lineno);
+	exit(1);      
+      }
+    }
+    if( current_range.dir!= NOT_PORT){
+      n->createPort(current_range.dir);
+    }
+    return;
+  }
+  current_cell->createBus(name,current_range.upper,current_range.lower,current_range.dir);
+  curCellBusses[name] = pair<int,int>(current_range.upper,current_range.lower);
+}
+
+void connectNodes(string portName) {
+  if (currentNodes.size() <= 1) {
+    if (currentNodes.empty() || !currentNodes[0]) {
+      fprintf(stderr,"\nconnectNodes: The node is not available in file %s line %d\n",current_file,vlog_lineno);
+      exit(1);
+    }
+    current_cell->connect(current_instance,currentNodes[0],portName);
+  } else {
+    vector<hcmPort*> availablePorts = current_instance->getAvailablePorts(portName);
+    unsigned int availablePortsNum = availablePorts.size();
+    if(availablePortsNum==0){
+      fprintf(stderr,"\nconnectNodes: The port is not available in file %s line %d\n",current_file,vlog_lineno);
+      exit(1);
+    }
+    if(availablePortsNum < currentNodes.size()){
+      fprintf(stderr,"\nconnectNodes: The width: %d of port: %s is not sufficient for connecting nodes: %lu in file %s line %d\n",
+	      availablePortsNum, portName.c_str(), currentNodes.size(), current_file,vlog_lineno);
+      for (unsigned int i = 0; i < currentNodes.size(); i++) {
+	if (currentNodes[i]) {
+	  fprintf(stderr, "  node: %s\n", currentNodes[i]->getName().c_str());
+	} else {
+	  fprintf(stderr, "  node: NULL\n");
+	}
+      }
+      exit(1);
+    }
+    int m = currentNodes.size() - 1;
+    for(int i = 0;i<=m;i++) {
+      current_cell->connect(current_instance,currentNodes[i],availablePorts[i]->getName());
+    }
+  }
+  currentNodes.clear();
+}
+
+/* connect based on order of ports */
+void connectNodesToNextPort() {
+  string portName;
+  if (designCellPortsListMap[global_design].find(masterName) == designCellPortsListMap[global_design].end()) {
+    fprintf(stderr,"\nconnectNodesToNextPort: No ports for master %s in file %s line %d\n",
+	    masterName, current_file,vlog_lineno);
+    exit(1);
+  }
+  if (designCellPortsListMap[global_design][masterName].size() <= (unsigned)curPortIdx) {
+    fprintf(stderr,"\nconnectNodesToNextPort: Not enough ports for master %s (%ld <= %d) in file %s line %d\n",
+	    masterName, designCellPortsListMap[global_design][masterName].size(), curPortIdx, current_file,vlog_lineno);
+    exit(1);
+  }
+  connectNodes(designCellPortsListMap[global_design][masterName][curPortIdx++]);
+}
+
+string busNodeName(string busName, int index){
+        
+  ostringstream result;
+  result << busName << '[' << index << ']';
+  return result.str();
+}
+
+void pushBus(const char* busName, int left, int right) {
+  string nodeName;
+
+  // we may get a signal name but it is a predefined bus...
+  if (left < 0) {
+    map< string, pair<int, int> >::const_iterator cbI = curCellBusses.find(busName);
+    if (cbI != curCellBusses.end()) {
+      left = (*cbI).second.first;
+      right = (*cbI).second.second;
+    }
+  }
+  if (left >= right) {
+    for (int i = left; i>=right ; i--) {
+      hcmNode *node;
+      if (left >= 0)
+	nodeName = busNodeName(busName,i);
+      else 
+	nodeName = busName;
+
+      node = current_cell->getNode(nodeName);
+#ifdef IMPLICIT_WIRES
+      if (!node) {
+	node = current_cell->createNode(nodeName);
+      }
+#endif	
+      if (!node) {
+	fprintf(stderr,"\nError finding node %s in file %s line %d \n",
+		nodeName.c_str(), current_file,vlog_lineno);
+	exit(1);
+      }
+      currentNodes.push_back(node);
+    }
+  } else {
+    for (int i = left; i<=right ; i++) {
+      nodeName = busNodeName(busName,i);
+      hcmNode *node = current_cell->getNode(nodeName);
+#ifdef IMPLICIT_WIRES
+      if (!node) {
+	node = current_cell->createNode(nodeName);
+      }
+#endif	
+      if (!node) {
+	fprintf(stderr,"\nError finding node %s in file %s line %d \n",
+		nodeName.c_str(), current_file,vlog_lineno);
+	exit(1);
+      }
+      currentNodes.push_back(node);
+    }
+  }
+}
+
+void pushBinaryBus(const char* binaryBusChar){
+  string binaryBus = binaryBusChar;
+  size_t i = binaryBus.find("'");
+  if( i == std::string::npos ) {
+    fprintf(stderr,"\nError in constant (no \"'\") in file %s line %d \n",current_file,vlog_lineno);
+    exit(1);
+  }
+
+  string base = binaryBus.substr(i+1,i+1);
+  string busLen = binaryBus.substr(0,i);
+  string valStr = binaryBus.substr(i+2);
+  unsigned long int val;
+  switch ((base.c_str())[0]) {
+  case 'b': val = strtoull(valStr.c_str(), NULL, 2); break;
+  case 'd': val = strtoull(valStr.c_str(), NULL, 10); break;
+  case 'h': val = strtoull(valStr.c_str(), NULL, 16); break;
+  default:
+    fprintf(stderr,"\nError in unknwon base %s of constant file %s line %d \n", 
+	    base.c_str(), current_file,vlog_lineno);
+    exit(1);
+  }
+
+  // convert the value to binary bus of width "bus length"
+  unsigned int numBits = atoi(busLen.c_str());
+  list<hcmNode*> busNodes;
+  for (unsigned int i = 0; i < numBits; i++) {
+    if (val % 2) {
+      busNodes.push_front(current_cell->getNode("VDD"));
+    } else {
+      busNodes.push_front(current_cell->getNode("VSS"));      
+    }
+    val = val >> 1;
+  }
+  // copy in order to currentNodes
+  /* string res; */
+  for (list<hcmNode*>::iterator lI = busNodes.begin(); lI != busNodes.end(); lI++) {
+    currentNodes.push_back(*lI);
+    /* res += (*lI)->getName() + string(","); */
+  }
+
+  /* fprintf(stderr,"\nEZ: converted %s to %s in file %s line %d \n",  */
+  /* 	  binaryBus.c_str(), res.c_str(), current_file, vlog_lineno); */
+
+}
+
+int 
+read_verilog(hcmDesign* design, const char *fn)
+{
+  global_design = design;
+  extern FILE *vlog_in;
+  int ret;
+  extern int vlog_lineno;
+
+  vlog_in=fopen(fn,"r");
+  if(vlog_in==NULL){
+    cerr << "Cannot open " << fn << endl;
+    return 0;
+  }
+  current_file=(char*)fn;
+  vlog_lineno=1;  
+  if(vlog_parse()==0){
+    ret=1; 
+  } else {
+    cerr << "Syntax Problem!\n";
+    ret=0;
+  }
+  fclose(vlog_in);
+  return ret;
+}
+
+

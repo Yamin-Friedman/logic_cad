@@ -1,0 +1,98 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+use diagnostics;
+use Getopt::Long;
+use Pod::Usage;
+
+my %MOD_PARENTS;
+my %MOD_CHILDREN;
+my %MODULE_TEXT;
+my %MOD_RANK;
+
+if (@ARGV < 2) {
+    print STDERR "Usage: $0 top-module file1 file2 ...\n";
+    exit(1);
+}
+
+my $topMod = shift @ARGV;
+
+my $nAdded = 0;
+sub parseFile($) 
+{
+    my $fn = shift;
+    open(F, "<$fn");
+    my $modName;
+    my $modContent = "";
+    while (my $line = <F>) {
+	if ($line =~ m/^\s*module\s+([^\s\(]+)/) {
+	    $modName = $1;
+	    $modContent .= $line;
+	} elsif ($line =~ m/^\s*endmodule/) {
+	    $modContent .= $line;
+	    $MODULE_TEXT{$modName} = $modContent;
+	    $modContent = "";
+	} else {
+	    $modContent .= $line;
+	}
+    }
+    close(F);
+} 
+# no we need to rank all children of children
+foreach my $f (@ARGV) {
+#    print STDERR "Parsing $f\n";
+    parseFile($f);
+}
+
+print STDERR "-I- Found ".scalar(keys(%MODULE_TEXT)) . " modules\n";
+
+# build dependency list for each module by parsing each module text
+foreach my $mod (keys(%MODULE_TEXT)) {
+    foreach my $line ($MODULE_TEXT{$mod} =~ m/([^\n]+)/g) {
+	if ($line =~ m/^\s*([A-Za-z][A-Za-z0-9_]+)\s+[A-Za-z][A-Za-z0-9_]+\s*([\(].*)/) {
+	    my ($master,$instPorts) = ($1,$2);
+#	    print STDERR "PARENT $mod of $master\n";
+	    if (defined($MODULE_TEXT{$master})) {
+		push @{ $MOD_PARENTS{$master} }, $mod;
+		push @{ $MOD_CHILDREN{$mod} }, $master;
+	    }
+	}
+    }
+}
+
+# starting from the top level visit all children marking them with top most rank
+my @Q;
+
+push @Q, $topMod;
+$MOD_RANK{$topMod} = 0;
+
+my $orderedVlog = "";
+while (scalar(@Q)) {
+    my $mod = shift @Q;
+    my $rank = $MOD_RANK{$mod};
+    # print STDERR "-I- module: $mod rank: $rank\n";
+    foreach my $child (@{$MOD_CHILDREN{$mod}}) {
+	if (!defined($MOD_RANK{$child}) || ($MOD_RANK{$child} < $rank+1)) {
+	    push @Q, $child;
+	    $MOD_RANK{$child} = $rank + 1;
+	}
+    }
+}
+
+# now sort the modules by rank and print them
+foreach my $mod (sort {$MOD_RANK{$a} <=> $MOD_RANK{$b}} (keys(%MOD_RANK))) {
+    my $rank = $MOD_RANK{$mod};
+    print STDERR "-I- module: $mod rank: $rank\n";
+    $orderedVlog = "$MODULE_TEXT{$mod}\n$orderedVlog";
+}
+print $orderedVlog;
+
+foreach my $mod (keys(%MODULE_TEXT)) {
+    if (!defined($MOD_RANK{$mod})) {
+	print STDERR "-E- Dropping module: $mod since not in tree of $topMod\n";
+    }
+}
+
+exit(0);
+
+__END__
