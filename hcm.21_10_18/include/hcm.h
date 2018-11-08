@@ -204,7 +204,7 @@ class hcmPort : public hcmObject {
   friend class hcmNode;
 };
 
-class hcmNode : public hcmObject {
+class   hcmNode : public hcmObject {
   std::map< std::string , hcmInstPort *> instPorts;
   hcmPort *port;
   hcmCell *cell;
