@@ -32,12 +32,13 @@ int main(int argc, char **argv) {
 	int anyErr = 0;
 	unsigned int i;
 	vector<string> vlgFiles;
+	string top_cell_name;
 
 	// Parse input
 	if (argc < 2) {
 		anyErr++;
 	} else {
-		string top_cell_name = argv[1];
+		top_cell_name = argv[1];
 
 		for (int argIdx = 2;argIdx < argc; argIdx++) {
 			vlgFiles.push_back(argv[argIdx]);
@@ -49,18 +50,23 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	if (anyErr) {
-		cerr << "Usage: " << argv[0] << "  [-v] top-cell file1.v [file2.v] ... \n";
-		exit(1);
-	}
-
+//	if (anyErr) {
+//		cerr << "Usage: " << argv[0] << "  [-v] top-cell file1.v [file2.v] ... \n";
+//		exit(1);
+//	}
+	cin >> top_cell_name;
+	string file;
+	cin >> file;
+	vlgFiles.push_back(file);
+	cin >> file;
+	vlgFiles.push_back(file);
 	// Build HCM design
 	set< string> globalNodes;
 	globalNodes.insert("VDD");
 	globalNodes.insert("VSS");
 
 	hcmDesign* design = new hcmDesign("design");
-	for (i = 1; i < vlgFiles.size(); i++) {
+	for (i = 0; i < vlgFiles.size(); i++) {
 		printf("-I- Parsing verilog %s ...\n", vlgFiles[i].c_str());
 		if (!design->parseStructuralVerilog(vlgFiles[i].c_str())) {
 			cerr << "-E- Could not parse: " << vlgFiles[i] << " aborting." << endl;
@@ -74,5 +80,8 @@ int main(int argc, char **argv) {
 
 	int num_nodes = top_cell->getNodes().size();
 
-	int max_depth = get_max_depth(top_cell);
+	//int max_depth = get_max_depth(top_cell);
+
+	cout << "instance count = " << num_instances << endl;
+	cout << "Node count = " << num_nodes << endl;
 }
