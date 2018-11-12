@@ -1,6 +1,3 @@
-//
-// Created by Yamin on 11/10/2018.
-//
 
 #include <errno.h>
 #include <signal.h>

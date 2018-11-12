@@ -1,6 +1,3 @@
-//
-// Created by Yamin on 11/7/2018.
-//
 
 #include <errno.h>
 #include <signal.h>
@@ -188,9 +185,9 @@ int main(int argc, char **argv) {
 
 	int num_nands = count_nands(top_cell);
 
-	cout << "instance count = " << num_instances << endl;
-	cout << "Node count = " << num_nodes << endl;
-	cout << "Max depth = " << max_depth << endl;
-	cout << "Numver of ands = " << num_ands_folded << endl;
-	cout << "Number of nands = " << num_nands << endl;
+	cout << "ia. Num top instances: " << num_instances << endl;
+	cout << "b. Num top nodes: " << num_nodes << endl;
+	cout << "c. Max reach depth: " << max_depth << endl;
+	cout << "d. Num and in folded: " << num_ands_folded << endl;
+	cout << "e. Num nand in hierarchy: " << num_nands << endl;
 }
