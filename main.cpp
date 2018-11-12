@@ -17,6 +17,7 @@ int get_depth_node(hcmNode *curr_node){
 	int curr_inst_port_depth;
 	int max_inst_port_depth = 0;
 	map<string,hcmInstPort*>::const_iterator nIP;
+
 	if(curr_node->getInstPorts().empty())
 		return 0;
 	for(nIP = curr_node->getInstPorts().begin();nIP != curr_node->getInstPorts().end();nIP++){
@@ -96,7 +97,7 @@ int main(int argc, char **argv) {
 
 	int max_depth = get_max_depth(top_cell);
 
-	cout << "instance count = " << num_instances << endl;
-	cout << "Node count = " << num_nodes << endl;
-	cout << "Max depth = " << max_depth << endl;
+	cout << "a. Num top instances: " << num_instances << endl;
+	cout << "b. Num top nodes: " << num_nodes << endl;
+	cout << "c. Max reach depth: " << max_depth << endl;
 }

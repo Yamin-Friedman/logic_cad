@@ -37,6 +37,24 @@ bool check_gate_can_be_ranked(hcmInstance &curr_gate){
 	return true;
 }
 
+struct rank_compare {
+	bool operator() (hcmInstance* lhs, hcmInstance* rhs) const {
+		int rank1, rank2;
+		lhs->getProp("rank",rank1);
+		rhs->getProp("rank",rank2);
+		if (rank1 < rank2)
+			return true;
+		else if (rank1 > rank2)
+			return false;
+		else {
+			string name1, name2;
+			name1 = lhs->getName();
+			name2 = rhs->getName();
+			return name1 < name2;
+		}
+	}
+};
+
 int main(int argc, char **argv) {
 	int anyErr = 0;
 	unsigned int i;
@@ -89,7 +107,7 @@ int main(int argc, char **argv) {
 
 	list<hcmNode*> node_list;
 	list<hcmInstance*> gate_list;
-	multimap<int,hcmInstance*> rank_map;
+	set<hcmInstance*,rank_compare> rank_set;
 
 	map<string,hcmNode*>::iterator NI;
 
@@ -109,7 +127,7 @@ int main(int argc, char **argv) {
 				if(check_gate_can_be_ranked(*curr_gate)){
 					int rank;
 					curr_gate->getProp("rank",rank);
-					rank_map.insert(pair<int,hcmInstance*>(rank,curr_gate));
+					rank_set.insert(curr_gate);
 					gate_list.emplace_back(curr_gate);
 				}
 			}
@@ -131,9 +149,11 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	multimap<int,hcmInstance*>::iterator map_it;
-	for (map_it = rank_map.begin(); map_it != rank_map.end(); map_it++){
-		cout << (*map_it).first << " " + (*map_it).second->getName() << endl;
+	set<hcmInstance*,rank_compare>::iterator set_it;
+	for (set_it = rank_set.begin(); set_it != rank_set.end(); set_it++){
+		int rank;
+		(*set_it)->getProp("rank",rank);
+		cout << rank << " " + (*set_it)->getName() << endl;
 	}
 
 	delete design;
