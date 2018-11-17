@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.6)
 project(ClionProject)
 
 set(CMAKE_CXX_STANDARD 11)
-set(SOURCE_FILES rank.cpp
+set(SOURCE_FILES stat.cpp
 
         )
 file(GLOB hcm.21_10_18

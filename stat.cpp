@@ -6,10 +6,11 @@
 #include <set>
 #include "hcm.h"
 #include "hcmvcd.h"
+#include "flat.h"
 
 using namespace std;
 
-
+bool verbose = false;
 
 int get_depth_node(hcmNode *curr_node){
 	int depth = 1;
@@ -29,11 +30,11 @@ int get_depth_node(hcmNode *curr_node){
 	return depth;
 }
 
-
-set<string> get_deepest_node (hcmCell *top_cell){
-	set<string> NodesSet = new set<string>;
-
-}
+// What is this?
+//set<string> get_deepest_node (hcmCell *top_cell){
+//	set<string> NodesSet = new set<string>;
+//
+//}
 
 int get_max_depth(hcmCell *top_cell){
 	map<string,hcmNode*>::const_iterator nI;
@@ -61,9 +62,9 @@ int count_nands(hcmCell *cell) {
 	return count;
 }
 
-void count_ands_folded_rec(hcmCell *cell, map<string,int> *visitedCellsCount) {
+void count_ands_folded_rec(hcmCell *cell, map<string,int> &visitedCellsCount) {
 
-	if (visitedCellsCount->find(cell->getName()) != visitedCellsCount->end()) return; //if already visited, return. 
+	if (visitedCellsCount.find(cell->getName()) != visitedCellsCount.end()) return; //if already visited, return.
 	if (cell->getInstances().empty()) return;
 
 	map<string, hcmInstance*>::const_iterator nIn;
@@ -76,15 +77,15 @@ void count_ands_folded_rec(hcmCell *cell, map<string,int> *visitedCellsCount) {
 		}
 		else count_ands_folded_rec((*nIn).second->masterCell(),visitedCellsCount); //recursive
 	}
-	if (count!=0) (*visitedCellsCount)[cell->getName()] = count;
+	if (count!=0) visitedCellsCount[cell->getName()] = count;
 }
 
 int count_ands_folded(hcmCell *topCell) {
-	map<string, int> *visitedCellsCount;
+	map<string, int> visitedCellsCount;
 	count_ands_folded_rec(topCell, visitedCellsCount);
 	map<string, int>::const_iterator itr;
 	int count = 0;
-	for (itr = visitedCellsCount->begin(); itr != visitedCellsCount->end(); itr++) {
+	for (itr = visitedCellsCount.begin(); itr != visitedCellsCount.end(); itr++) {
 		count += (*itr).second;
 	}
 	return count;
@@ -96,14 +97,15 @@ int count_in_String(string s) {
 		if (s[i] == '/') count++;
 	return count;
 }
-void print_topmost_nodes(hcmCell *topCell) {
-	set<string> Nodes = new set<string>();
-	hcmCell *top_cell_flat = hcmFlatten(top_cell_name + "_flat", top_cell, globalNodes);
+void print_topmost_nodes(hcmCell *topCell, set< string> &globalNodes) {
+	set<string> Nodes;
+	hcmCell *top_cell_flat = hcmFlatten(topCell->getName() + "_flat", topCell, globalNodes);
 	map<string, hcmNode*>::iterator NI;
 	int maxLevel = 0;
 	for (NI = top_cell_flat->getNodes().begin(); NI != top_cell_flat->getNodes().end(); NI++) {
 		int curr = count_in_String((*NI).first);
 		if (curr > maxLevel) { //new depth
+			maxLevel = curr;
 			Nodes.clear();
 			Nodes.insert((*NI).first);
 		}
@@ -111,9 +113,10 @@ void print_topmost_nodes(hcmCell *topCell) {
 			Nodes.insert((*NI).first);
 		}
 	}
+	cout << "f. Max depth node: " << maxLevel << endl;
 	set<string>::iterator itr;
-	for (itr = Nodes.begin(); itr != Nodes.end()litr++) { //print out nodes
-		cout << (*itr) << endl;
+	for (itr = Nodes.begin(); itr != Nodes.end(); itr++) { //print out nodes
+		cout << "f. Node: " << (*itr) << endl;
 	}
 }
 
@@ -184,6 +187,6 @@ int main(int argc, char **argv) {
 	cout << "c. Max reach depth: " << max_depth << endl;
 	cout << "d. Num and in folded: " << num_ands_folded << endl;
 	cout << "e. Num nand in hierarchy: " << num_nands << endl;
-	count << "f. Top most node in hierarchy: " << endl;
-	print_topmost_nodes(top_cell);
+
+	print_topmost_nodes(top_cell,globalNodes);
 }

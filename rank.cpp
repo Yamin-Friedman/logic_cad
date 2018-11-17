@@ -4,6 +4,7 @@
 #include <sstream>
 #include <fstream>
 #include <set>
+#include <algorithm>
 #include "hcm.h"
 #include "hcmvcd.h"
 #include "flat.h"
@@ -82,8 +83,8 @@ int main(int argc, char **argv) {
 	string file;
 	cin >> file;
 	vlgFiles.push_back(file);
-	cin >> file;
-	vlgFiles.push_back(file);
+//	cin >> file;
+//	vlgFiles.push_back(file);
 	// Build HCM design
 	set< string> globalNodes;
 	globalNodes.insert("VDD");
@@ -152,6 +153,15 @@ int main(int argc, char **argv) {
 		(*set_it)->getProp("rank",rank);
 		cout << rank << " " + (*set_it)->getName() << endl;
 	}
+
+	map<string,hcmNode*>::iterator it;
+	for (it = top_cell_flat->getNodes().begin(); it != top_cell_flat->getNodes().end(); it++){
+		string name = (*it).second->getName();
+		int count = std::count(name.begin(), name.end(), '/');
+//		if(count == 1)
+			cout << name << endl;
+	}
+	
 
 	delete design;
 }
