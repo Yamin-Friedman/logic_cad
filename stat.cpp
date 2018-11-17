@@ -30,28 +30,10 @@ int get_depth_node(hcmNode *curr_node){
 }
 
 
-/*ignore
-int get_depth_node(hcmNode *curr_node, int curr_depth) {
-	int depth = curr_depth+1;
-	int curr_inst_port_depth;
-	map<string, hcmInstPort*>::const_iterator nIP;
-	if (curr_node->getInstPorts().empty())
-		if (curr_depth > max_depth) {
-			max_depth = curr_depth;
-		}
-		return 0;
-	for (nIP = curr_node->getInstPorts().begin(); nIP != curr_node->getInstPorts().end(); nIP++) {
-		hcmPort *inst_port_port = (*nIP).second->getPort();
-		hcmNode *inst_port_node = inst_port_port->owner();
-		int curr_inst_port_depth=get_depth_node(inst_port_node, depth);
-		if (curr_inst_port_depth == 0 && depth + 1 == max_depth) {
-			deepest_connection_node = inst_port_node;
+set<string> get_deepest_node (hcmCell *top_cell){
+	set<string> NodesSet = new set<string>;
 
-		}
-	}
-	return depth;
-	
-} */
+}
 
 int get_max_depth(hcmCell *top_cell){
 	map<string,hcmNode*>::const_iterator nI;
@@ -108,23 +90,35 @@ int count_ands_folded(hcmCell *topCell) {
 	return count;
 }
 
-
-//ignore for now
-/*int get_deepest_connection(hcmCell *top_cell) {
-	map<string, hcmNode*>::const_iterator nI;
-	max_depth = 0;
-	deepest_connection_node = NULL;
-	for (nI = top_cell->getNodes().begin(); nI != top_cell->getNodes().end(); nI++) {
-		get_depth_node((*nI).second, 1);
+int count_in_String(string s) {
+	int count = 0;
+	for (int i = 0; i < s.size(); i++)
+		if (s[i] == '/') count++;
+	return count;
+}
+void print_topmost_nodes(hcmCell *topCell) {
+	set<string> Nodes = new set<string>();
+	hcmCell *top_cell_flat = hcmFlatten(top_cell_name + "_flat", top_cell, globalNodes);
+	map<string, hcmNode*>::iterator NI;
+	int maxLevel = 0;
+	for (NI = top_cell_flat->getNodes().begin(); NI != top_cell_flat->getNodes().end(); NI++) {
+		int curr = count_in_String((*NI).first);
+		if (curr > maxLevel) { //new depth
+			Nodes.clear();
+			Nodes.insert((*NI).first);
+		}
+		else if (curr = maxLevel) {
+			Nodes.insert((*NI).first);
+		}
 	}
-
-	map<string, hcmInstPort*>::const_iterator nIP;
-	set<string> 
-	for (nIP = deepest_connection_node->getInstPorts().begin(); nIP != deepest_connection_node->getInstPorts().end(); nIP++) {
-		hcmInstance currInst = (*nIP).second->getInst()
-
+	set<string>::iterator itr;
+	for (itr = Nodes.begin(); itr != Nodes.end()litr++) { //print out nodes
+		cout << (*itr) << endl;
 	}
-}*/
+}
+
+
+
 
 
 int main(int argc, char **argv) {
@@ -190,4 +184,6 @@ int main(int argc, char **argv) {
 	cout << "c. Max reach depth: " << max_depth << endl;
 	cout << "d. Num and in folded: " << num_ands_folded << endl;
 	cout << "e. Num nand in hierarchy: " << num_nands << endl;
+	count << "f. Top most node in hierarchy: " << endl;
+	print_topmost_nodes(top_cell);
 }
