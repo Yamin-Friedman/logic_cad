@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
 	for (NI = top_cell_flat->getNodes().begin();NI != top_cell_flat->getNodes().end();NI++){
 		if ((*NI).second->getPort() && (*NI).second->getPort()->getDirection() == IN){
 			(*NI).second->setProp("rank",0);
-			node_list.emplace_back((*NI).second);
+			node_list.push_back((*NI).second);
 		}
 	}
 
@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
 					int rank;
 					curr_gate->getProp("rank",rank);
 					rank_set.insert(curr_gate);
-					gate_list.emplace_back(curr_gate);
+					gate_list.push_back(curr_gate);
 				}
 			}
 			node_list.erase(NVI++);
@@ -138,7 +138,7 @@ int main(int argc, char **argv) {
 				if(curr_node->getProp("rank",rank) == NOT_FOUND){
 					(*inst_VI)->getProp("rank",rank);
 					curr_node->setProp("rank",rank + 1);
-					node_list.emplace_back(curr_node);
+					node_list.push_back(curr_node);
 				}
 			}
 			gate_list.erase(inst_VI++);
