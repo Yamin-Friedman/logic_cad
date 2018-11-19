@@ -4,12 +4,12 @@
 #include <set>
 #include <list>
 #include "hcm.h"
-#include "flat.h"
 
 using namespace std;
 
 bool verbose = false;
 
+// This function gets the number of heirarchies that the node traverses recursively
 int get_depth_node(hcmNode *curr_node){
 	int depth = 1;
 	int curr_inst_port_depth;
@@ -28,6 +28,7 @@ int get_depth_node(hcmNode *curr_node){
 	return depth;
 }
 
+// This function finds the top cell node that traverses the most levels of heirarchy and returns the depth
 int get_max_depth(hcmCell *top_cell){
 	map<string,hcmNode*>::const_iterator nI;
 	int curr_depth = 0;
@@ -40,6 +41,7 @@ int get_max_depth(hcmCell *top_cell){
 	return max_depth;
 }
 
+// This function counts the number of nands in the entire design
 int count_nands(hcmCell *cell) {
 	map<string, hcmInstance*>::const_iterator nIn;
 	int count = 0;
@@ -54,6 +56,7 @@ int count_nands(hcmCell *cell) {
 	return count;
 }
 
+// This function counts the number of ands in the folded model recursively
 void count_ands_folded_rec(hcmCell *cell, map<string,int> &visitedCellsCount) {
 
 	if (visitedCellsCount.find(cell->getName()) != visitedCellsCount.end()) return; //if already visited, return.
@@ -72,6 +75,7 @@ void count_ands_folded_rec(hcmCell *cell, map<string,int> &visitedCellsCount) {
 	if (count!=0) visitedCellsCount[cell->getName()] = count;
 }
 
+// This function returns the number of ands in the folded model
 int count_ands_folded(hcmCell *topCell) {
 	map<string, int> visitedCellsCount;
 	count_ands_folded_rec(topCell, visitedCellsCount);
@@ -83,14 +87,15 @@ int count_ands_folded(hcmCell *topCell) {
 	return count;
 }
 
+// This function recursively finds the heirarchical names of the nodes that are deepest
 void get_list_deep_nodes(hcmCell *top_cell,list<string> &deep_node_list,int &max_node_depth, int curr_depth, string prefix, set< string> &globalNodes){
 	map<string, hcmNode* >::iterator node_it;
 	map<string,hcmInstance*>::iterator inst_it;
 	for ( node_it = top_cell->getNodes().begin();  node_it != top_cell->getNodes().end();  node_it++){
 		hcmNode *node = (*node_it).second;
-		if (!node->getPort() && globalNodes.find(node->getName()) == globalNodes.end()){
+		if (!node->getPort() && globalNodes.find(node->getName()) == globalNodes.end()){ // Makes sure that the node doesn't have a higher connection
 			if (curr_depth >= max_node_depth){
-				if (curr_depth > max_node_depth){
+				if (curr_depth > max_node_depth){ // If we have found a deeper node than we have to clear all the previous names
 					max_node_depth = curr_depth;
 					deep_node_list.clear();
 				}
@@ -98,6 +103,7 @@ void get_list_deep_nodes(hcmCell *top_cell,list<string> &deep_node_list,int &max
 			}
 		}
 	}
+	// Loops recursively over all instances in the current cell
 	for (inst_it = top_cell->getInstances().begin(); inst_it != top_cell->getInstances().end(); inst_it++){
 		hcmInstance *inst = (*inst_it).second;
 		hcmCell *cell = (*inst_it).second->masterCell();
@@ -105,34 +111,36 @@ void get_list_deep_nodes(hcmCell *top_cell,list<string> &deep_node_list,int &max
 	}
 }
 
-int count_in_String(string s) {
-	int count = 0;
-	for (int i = 0; i < s.size(); i++)
-		if (s[i] == '/') count++;
-	return count;
-}
-void print_topmost_nodes(hcmCell *topCell, set< string> &globalNodes) {
-	set<string> Nodes;
-	hcmCell *top_cell_flat = hcmFlatten(topCell->getName() + "_flat", topCell, globalNodes);
-	map<string, hcmNode*>::iterator NI;
-	int maxLevel = 0;
-	for (NI = top_cell_flat->getNodes().begin(); NI != top_cell_flat->getNodes().end(); NI++) {
-		int curr = count_in_String((*NI).first);
-		if (curr > maxLevel) { //new depth
-			maxLevel = curr;
-			Nodes.clear();
-			Nodes.insert((*NI).first);
-		}
-		else if (curr = maxLevel) {
-			Nodes.insert((*NI).first);
-		}
-	}
-	cout << "f. Max depth node: " << maxLevel << endl;
-	set<string>::iterator itr;
-	for (itr = Nodes.begin(); itr != Nodes.end(); itr++) { //print out nodes
-		cout << "f. Node: " << (*itr) << endl;
-	}
-}
+// I have replaced this code because I believe after talking with Eitan that this is not the method they were looking for. Not surprisingly...
+
+//int count_in_String(string s) {
+//	int count = 0;
+//	for (int i = 0; i < s.size(); i++)
+//		if (s[i] == '/') count++;
+//	return count;
+//}
+//void print_topmost_nodes(hcmCell *topCell, set< string> &globalNodes) {
+//	set<string> Nodes;
+//	hcmCell *top_cell_flat = hcmFlatten(topCell->getName() + "_flat", topCell, globalNodes);
+//	map<string, hcmNode*>::iterator NI;
+//	int maxLevel = 0;
+//	for (NI = top_cell_flat->getNodes().begin(); NI != top_cell_flat->getNodes().end(); NI++) {
+//		int curr = count_in_String((*NI).first);
+//		if (curr > maxLevel) { //new depth
+//			maxLevel = curr;
+//			Nodes.clear();
+//			Nodes.insert((*NI).first);
+//		}
+//		else if (curr = maxLevel) {
+//			Nodes.insert((*NI).first);
+//		}
+//	}
+//	cout << "f. Max depth node: " << maxLevel << endl;
+//	set<string>::iterator itr;
+//	for (itr = Nodes.begin(); itr != Nodes.end(); itr++) { //print out nodes
+//		cout << "f. Node: " << (*itr) << endl;
+//	}
+//}
 
 
 
@@ -172,7 +180,6 @@ int main(int argc, char **argv) {
 
 	hcmDesign* design = new hcmDesign("design");
 	for (i = 0; i < vlgFiles.size(); i++) {
-		printf("-I- Parsing verilog %s ...\n", vlgFiles[i].c_str());
 		if (!design->parseStructuralVerilog(vlgFiles[i].c_str())) {
 			cerr << "-E- Could not parse: " << vlgFiles[i] << " aborting." << endl;
 			exit(1);
@@ -181,20 +188,27 @@ int main(int argc, char **argv) {
 
 	hcmCell *top_cell = design->getCell(top_cell_name);
 
+	// Answer to part a
 	int num_instances = top_cell->getInstances().size();
 
+	// Answer to part b
 	int num_nodes = top_cell->getNodes().size();
 
+	// Answer to part c
 	int max_depth = get_max_depth(top_cell);
 
+	// Answer to part d
 	int num_ands_folded = count_ands_folded(top_cell);
 
+	// Answer to part e
 	int num_nands = count_nands(top_cell);
 
+	// Answer to part f
 	list<string> deep_node_list;
 	int max_node_depth = 0;
 	get_list_deep_nodes(top_cell,deep_node_list,max_node_depth, 0, "", globalNodes);
 
+	// Print the output to a file
 	ofstream output_file;
 	output_file.open((top_cell_name + ".stat").c_str(),fstream::out);
 	output_file << "a. Num top instances: " << num_instances << endl;

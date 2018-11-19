@@ -11,6 +11,8 @@ using namespace std;
 
 bool verbose = false;
 
+
+// This function checks to see if all the ports leading into this gate have been ranked allowing the rank for this gate to be decided and ranks it accordingly
 bool check_gate_can_be_ranked(hcmInstance &curr_gate){
 	map<string,hcmInstPort*>::iterator it;
 	int rank;
@@ -33,6 +35,7 @@ bool check_gate_can_be_ranked(hcmInstance &curr_gate){
 	return true;
 }
 
+// This struct is used in the set of gates to allow proper sorting based on rank and name
 struct rank_compare {
 	bool operator() (hcmInstance* lhs, hcmInstance* rhs) const {
 		int rank1, rank2;
@@ -85,7 +88,6 @@ int main(int argc, char **argv) {
 
 	hcmDesign* design = new hcmDesign("design");
 	for (i = 0; i < vlgFiles.size(); i++) {
-		printf("-I- Parsing verilog %s ...\n", vlgFiles[i].c_str());
 		if (!design->parseStructuralVerilog(vlgFiles[i].c_str())) {
 			cerr << "-E- Could not parse: " << vlgFiles[i] << " aborting." << endl;
 			exit(1);
@@ -94,6 +96,7 @@ int main(int argc, char **argv) {
 
 	hcmCell *top_cell = design->getCell(top_cell_name);
 
+	// We use the flat model here because the algorithm runs at a gate level and thus should not be affected by levels of heirarchy
 	hcmCell *top_cell_flat = hcmFlatten(top_cell_name + "_flat",top_cell,globalNodes);
 
 	list<hcmNode*> node_list;
@@ -102,6 +105,7 @@ int main(int argc, char **argv) {
 
 	map<string,hcmNode*>::iterator NI;
 
+	// Give a rank of 0 to all the input nodes
 	for (NI = top_cell_flat->getNodes().begin();NI != top_cell_flat->getNodes().end();NI++){
 		if ((*NI).second->getPort() && (*NI).second->getPort()->getDirection() == IN){
 			(*NI).second->setProp("rank",0);
@@ -109,10 +113,12 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	// Loops until all the gates and nodes in the flat model are ranked
 	while(!node_list.empty() || !gate_list.empty()){
 		list<hcmNode*>::iterator NVI;
 		for (NVI = node_list.begin();NVI != node_list.end();){
 			map<string,hcmInstPort*>::iterator instp_MI;
+			// Goes over all of the nodes that have just been ranked and checks to see if the gates attached to them can be ranked
 			for (instp_MI = (*NVI)->getInstPorts().begin(); instp_MI != (*NVI)->getInstPorts().end();instp_MI++){
 				hcmInstance *curr_gate = (*instp_MI).second->getInst();
 				if(check_gate_can_be_ranked(*curr_gate)){
@@ -127,6 +133,7 @@ int main(int argc, char **argv) {
 		list<hcmInstance*>::iterator inst_VI;
 		for (inst_VI = gate_list.begin(); inst_VI != gate_list.end();){
 			map<string,hcmInstPort*>::iterator instp_MI;
+			// Loops over all the gates that have just been ranked and ranks any previously unranked nodes connected to them and adds them to the nodes list
 			for (instp_MI = (*inst_VI)->getInstPorts().begin(); instp_MI != (*inst_VI)->getInstPorts().end(); instp_MI++){
 				hcmNode *curr_node = (*instp_MI).second->getNode();
 				int rank;
@@ -140,6 +147,7 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	// Outputs the results into a file
 	ofstream output_file;
 	output_file.open((top_cell_name + ".ranks").c_str(), fstream::out);
 
