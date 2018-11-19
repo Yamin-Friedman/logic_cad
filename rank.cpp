@@ -73,11 +73,16 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	if (anyErr) {
-		cerr << "Usage: " << argv[0] << "  [-v] top-cell file1.v [file2.v] ... \n";
-		exit(1);
-	}
-
+//	if (anyErr) {
+//		cerr << "Usage: " << argv[0] << "  [-v] top-cell file1.v [file2.v] ... \n";
+//		exit(1);
+//	}
+	cin >> top_cell_name;
+	string file;
+	cin >> file;
+	vlgFiles.push_back(file);
+//	cin >> file;
+//	vlgFiles.push_back(file);
 	// Build HCM design
 	set< string> globalNodes;
 	globalNodes.insert("VDD");
