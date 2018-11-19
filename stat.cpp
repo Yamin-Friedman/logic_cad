@@ -1,11 +1,9 @@
 
-#include <errno.h>
-#include <signal.h>
 #include <sstream>
 #include <fstream>
 #include <set>
+#include <list>
 #include "hcm.h"
-#include "hcmvcd.h"
 #include "flat.h"
 
 using namespace std;
@@ -29,12 +27,6 @@ int get_depth_node(hcmNode *curr_node){
 	depth += max_inst_port_depth;
 	return depth;
 }
-
-// What is this?
-//set<string> get_deepest_node (hcmCell *top_cell){
-//	set<string> NodesSet = new set<string>;
-//
-//}
 
 int get_max_depth(hcmCell *top_cell){
 	map<string,hcmNode*>::const_iterator nI;
@@ -89,6 +81,28 @@ int count_ands_folded(hcmCell *topCell) {
 		count += (*itr).second;
 	}
 	return count;
+}
+
+void get_list_deep_nodes(hcmCell *top_cell,list<string> &deep_node_list,int &max_node_depth, int curr_depth, string prefix, set< string> &globalNodes){
+	map<string, hcmNode* >::iterator node_it;
+	map<string,hcmInstance*>::iterator inst_it;
+	for ( node_it = top_cell->getNodes().begin();  node_it != top_cell->getNodes().end();  node_it++){
+		hcmNode *node = (*node_it).second;
+		if (!node->getPort() && globalNodes.find(node->getName()) == globalNodes.end()){
+			if (curr_depth >= max_node_depth){
+				if (curr_depth > max_node_depth){
+					max_node_depth = curr_depth;
+					deep_node_list.clear();
+				}
+				deep_node_list.push_back(prefix + node->getName());
+			}
+		}
+	}
+	for (inst_it = top_cell->getInstances().begin(); inst_it != top_cell->getInstances().end(); inst_it++){
+		hcmInstance *inst = (*inst_it).second;
+		hcmCell *cell = (*inst_it).second->masterCell();
+		get_list_deep_nodes(cell, deep_node_list,max_node_depth, curr_depth + 1,prefix + inst->getName() + "/", globalNodes);
+	}
 }
 
 int count_in_String(string s) {
@@ -146,16 +160,11 @@ int main(int argc, char **argv) {
 		}
 	}
 
-//	if (anyErr) {
-//		cerr << "Usage: " << argv[0] << "  [-v] top-cell file1.v [file2.v] ... \n";
-//		exit(1);
-//	}
-	cin >> top_cell_name;
-	string file;
-	cin >> file;
-	vlgFiles.push_back(file);
-	cin >> file;
-	vlgFiles.push_back(file);
+	if (anyErr) {
+		cerr << "Usage: " << argv[0] << "  [-v] top-cell file1.v [file2.v] ... \n";
+		exit(1);
+	}
+
 	// Build HCM design
 	set< string> globalNodes;
 	globalNodes.insert("VDD");
@@ -182,11 +191,24 @@ int main(int argc, char **argv) {
 
 	int num_nands = count_nands(top_cell);
 
-	cout << "ia. Num top instances: " << num_instances << endl;
-	cout << "b. Num top nodes: " << num_nodes << endl;
-	cout << "c. Max reach depth: " << max_depth << endl;
-	cout << "d. Num and in folded: " << num_ands_folded << endl;
-	cout << "e. Num nand in hierarchy: " << num_nands << endl;
+	list<string> deep_node_list;
+	int max_node_depth = 0;
+	get_list_deep_nodes(top_cell,deep_node_list,max_node_depth, 0, "", globalNodes);
 
-	print_topmost_nodes(top_cell,globalNodes);
+	ofstream output_file;
+	output_file.open(top_cell_name + ".stat");
+	output_file << "a. Num top instances: " << num_instances << endl;
+	output_file << "b. Num top nodes: " << num_nodes << endl;
+	output_file << "c. Max reach depth: " << max_depth << endl;
+	output_file << "d. Num and in folded: " << num_ands_folded << endl;
+	output_file << "e. Num nand in hierarchy: " << num_nands << endl;
+	output_file << "f. Max depth node: " << max_node_depth << endl;
+	list<string>::iterator list_it;
+	for(list_it = deep_node_list.begin(); list_it != deep_node_list.end(); list_it++){
+		output_file << "f. Node: " << (*list_it) << endl;
+	}
+	output_file.close();
+
+	delete design;
+
 }
