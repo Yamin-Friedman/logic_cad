@@ -160,16 +160,11 @@ int main(int argc, char **argv) {
 		}
 	}
 
-//	if (anyErr) {
-//		cerr << "Usage: " << argv[0] << "  [-v] top-cell file1.v [file2.v] ... \n";
-//		exit(1);
-//	}
-	cin >> top_cell_name;
-	string file;
-	cin >> file;
-	vlgFiles.push_back(file);
-	cin >> file;
-	vlgFiles.push_back(file);
+	if (anyErr) {
+		cerr << "Usage: " << argv[0] << "  [-v] top-cell file1.v [file2.v] ... \n";
+		exit(1);
+	}
+
 	// Build HCM design
 	set< string> globalNodes;
 	globalNodes.insert("VDD");
@@ -201,7 +196,7 @@ int main(int argc, char **argv) {
 	get_list_deep_nodes(top_cell,deep_node_list,max_node_depth, 0, "", globalNodes);
 
 	ofstream output_file;
-	output_file.open(top_cell_name + ".stat");
+	output_file.open((top_cell_name + ".stat").c_str(),fstream::out);
 	output_file << "a. Num top instances: " << num_instances << endl;
 	output_file << "b. Num top nodes: " << num_nodes << endl;
 	output_file << "c. Max reach depth: " << max_depth << endl;

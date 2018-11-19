@@ -73,16 +73,11 @@ int main(int argc, char **argv) {
 		}
 	}
 
-//	if (anyErr) {
-//		cerr << "Usage: " << argv[0] << "  [-v] top-cell file1.v [file2.v] ... \n";
-//		exit(1);
-//	}
-	cin >> top_cell_name;
-	string file;
-	cin >> file;
-	vlgFiles.push_back(file);
-//	cin >> file;
-//	vlgFiles.push_back(file);
+	if (anyErr) {
+		cerr << "Usage: " << argv[0] << "  [-v] top-cell file1.v [file2.v] ... \n";
+		exit(1);
+	}
+
 	// Build HCM design
 	set< string> globalNodes;
 	globalNodes.insert("VDD");
@@ -146,7 +141,7 @@ int main(int argc, char **argv) {
 	}
 
 	ofstream output_file;
-	output_file.open(top_cell_name + ".ranks");
+	output_file.open((top_cell_name + ".ranks").c_str(), fstream::out);
 
 	set<hcmInstance*,rank_compare>::iterator set_it;
 	for (set_it = rank_set.begin(); set_it != rank_set.end(); set_it++){
