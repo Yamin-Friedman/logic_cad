@@ -111,41 +111,6 @@ void get_list_deep_nodes(hcmCell *top_cell,list<string> &deep_node_list,int &max
 	}
 }
 
-// I have replaced this code because I believe after talking with Eitan that this is not the method they were looking for. Not surprisingly...
-
-//int count_in_String(string s) {
-//	int count = 0;
-//	for (int i = 0; i < s.size(); i++)
-//		if (s[i] == '/') count++;
-//	return count;
-//}
-//void print_topmost_nodes(hcmCell *topCell, set< string> &globalNodes) {
-//	set<string> Nodes;
-//	hcmCell *top_cell_flat = hcmFlatten(topCell->getName() + "_flat", topCell, globalNodes);
-//	map<string, hcmNode*>::iterator NI;
-//	int maxLevel = 0;
-//	for (NI = top_cell_flat->getNodes().begin(); NI != top_cell_flat->getNodes().end(); NI++) {
-//		int curr = count_in_String((*NI).first);
-//		if (curr > maxLevel) { //new depth
-//			maxLevel = curr;
-//			Nodes.clear();
-//			Nodes.insert((*NI).first);
-//		}
-//		else if (curr = maxLevel) {
-//			Nodes.insert((*NI).first);
-//		}
-//	}
-//	cout << "f. Max depth node: " << maxLevel << endl;
-//	set<string>::iterator itr;
-//	for (itr = Nodes.begin(); itr != Nodes.end(); itr++) { //print out nodes
-//		cout << "f. Node: " << (*itr) << endl;
-//	}
-//}
-
-
-
-
-
 int main(int argc, char **argv) {
 	int anyErr = 0;
 	unsigned int i;
