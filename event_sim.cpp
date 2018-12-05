@@ -13,6 +13,127 @@ bool verbose = false;
 
 typedef int (*gate_operator)(vector<int>&);
 
+// inv_func: Inverts the input
+int inv_func(vector<int>& input_vec){
+	int res = input_vec[0];
+
+	return !res;
+}
+
+// buffer_func: returns the input
+int buffer_func(vector<int>& input_vec){
+	int res = input_vec[0];
+
+	return res;
+}
+
+// or_func: Computes OR between all the inputs received in the input_vec
+int or_func(vector<int>& input_vec){
+	int res = input_vec[0];
+
+	for(int i = 1;i < input_vec.size();i++){
+		res |= input_vec[i];
+	}
+
+	return res;
+}
+
+// nor_func: Computes NOR between all the inputs received in the input_vec
+int nor_func(vector<int>& input_vec){
+	int res = input_vec[0];
+
+	for(int i = 1;i < input_vec.size();i++){
+		res |= input_vec[i];
+	}
+
+	return !res;
+}
+
+// and_func: Computes AND between all the inputs received in the input_vec
+int and_func(vector<int>& input_vec){
+	int res = input_vec[0];
+
+	for(int i = 1;i < input_vec.size();i++){
+		res &= input_vec[i];
+	}
+
+	return res;
+}
+
+// nand_func: Computes NAND between all the inputs received in the input_vec
+int nand_func(vector<int>& input_vec){
+	int res = input_vec[0];
+
+	for(int i = 1;i < input_vec.size();i++){
+		res &= input_vec[i];
+	}
+
+	return !res;
+}
+
+// xor_func: Computes XOR between all the inputs received in the input_vec
+int xor_func(vector<int>& input_vec){
+	int res = input_vec[0];
+
+	for(int i = 1;i < input_vec.size();i++){
+		res ^= input_vec[i];
+	}
+
+	return res;
+}
+
+gate_operator get_gate_type(string gate_name){
+	if(gate_name.find("buffer") != string::npos){
+		return buffer_func;
+	}
+	if(gate_name.find("inv") != string::npos){
+		return inv_func;
+	}
+	if(gate_name.find("nand") != string::npos){
+		return nand_func;
+	}
+	if(gate_name.find("and") != string::npos){
+		return and_func;
+	}
+	if(gate_name.find("nor") != string::npos){
+		return nor_func;
+	}
+	if(gate_name.find("xor") != string::npos){
+		return xor_func;
+	}
+	if(gate_name.find("or") != string::npos){
+		return or_func;
+	}
+}
+
+void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue){
+	vector<int> input_vals;
+	hcmNode *output_node;
+	int output_value, old_output_value;
+	gate_operator gate_func;
+
+	map< string , hcmInstPort *>::iterator inst_port_it = gate->getInstPorts().begin();
+
+	for(;inst_port_it != gate->getInstPorts().end();inst_port_it++){
+		hcmInstPort *inst_port = (*inst_port_it).second;
+		hcmNode *node = inst_port->getNode();
+		if(inst_port->getPort()->getDirection() == IN){
+			int val;
+			node->getProp("value",val);
+			input_vals.emplace_back(val);
+		} else{
+			output_node = node;
+		}
+	}
+	gate->getProp("gate_type",gate_func);
+	output_value = gate_func(input_vals);
+	output_node->getProp("value",old_output_value);
+	if(output_value != old_output_value){
+		output_node->setProp("value",output_value);
+		event_queue.push(output_node);
+	}
+}
+
 int main(int argc, char **argv) {
 	int anyErr = 0;
 	unsigned int i;
