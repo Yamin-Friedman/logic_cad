@@ -13,6 +13,21 @@ bool verbose = false;
 
 typedef int (*gate_operator)(vector<int>&);
 
+//This gets the fanout on node and pushes the gates into the gate
+void process_event(hcmNode* node, queue<hcmInstance*> gate_queue){
+	map<string, hcmInstPort* > InstPorts = node->getInstPorts();
+	if(InstPorts.empty())
+		return;
+	map<string,hcmInstPort*>::const_iterator iter;
+	for (iter=InstPorts.begin();iter!=InstPorts.end();iter++){
+		hcmPort *port= (*iter).second->getPort();
+		if(port->getDirection()==OUT){
+		    hcmInstance* curr_gate = (*iter).second->getInst();
+		    gate_queue.push(curr_gate);
+		}
+	}
+}
+
 int main(int argc, char **argv) {
 	int anyErr = 0;
 	unsigned int i;
