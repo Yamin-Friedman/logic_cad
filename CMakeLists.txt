@@ -16,6 +16,8 @@ file(GLOB SOURCES
         hcm.21_10_18/src/*.cpp
         hcm.21_10_18/flattener/*.h
         hcm.21_10_18/flattener/flat.cc
+        hcm.21_10_18/sigvec/*.h
+        hcm.21_10_18/sigvec/*.cc
         )
 
 include_directories(
@@ -24,6 +26,7 @@ include_directories(
         hcm.21_10_18/include
         hcm.21_10_18/hcm_vcd
         hcm.21_10_18/flattener
-        hcm.21_10_18/vcd)
+        hcm.21_10_18/vcd
+        hcm.21_10_18/sigvec)
 
 add_executable(ClionProject ${SOURCE_FILES} ${hcm.21_10_18} ${SOURCES})

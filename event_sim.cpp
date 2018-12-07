@@ -6,6 +6,7 @@
 #include <queue>
 #include "hcm.h"
 #include "flat.h"
+#include "hcmsigvec.h"
 
 using namespace std;
 
@@ -14,7 +15,7 @@ bool verbose = false;
 typedef int (*gate_operator)(vector<int>&);
 
 //This gets the fanout on node and pushes the gates into the gate
-void process_event(hcmNode* node, queue<hcmInstance*> gate_queue){
+void process_event(hcmNode* node, queue<hcmInstance*> &gate_queue){
 	map<string, hcmInstPort* > InstPorts = node->getInstPorts();
 	if(InstPorts.empty())
 		return;
@@ -149,6 +150,28 @@ void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue){
 	}
 }
 
+int read_next_input(hcmSigVec &InputSigVec,set<hcmPort*> InputPorts, queue<hcmNode*> &event_queue) { //this function reads the next line, updates event_queue
+
+    int res = InputSigVec.readVector();
+    while (res != 0) { //will read until reaches a good line (not empty)
+        if (res == -1)return res; //reached EOF
+        res = InputSigVec.readVector();
+    }
+    bool val;
+    set<hcmPort *>::const_iterator itr = InputPorts.begin();
+    for (itr; itr != InputPorts.end(); itr++) {
+        hcmNode *currNode = (*itr)->owner();
+        if (InputSigVec.getSigValue((*itr)->getName(),val)!=0){
+            //could not read signal - handle error (should not happen since signal name is from signals set
+            return -1; //may need to change
+        }
+        currNode->setProp("value",val); //setting the value of the node. //check if handles buses properly
+        event_queue.push(currNode); //add to event queue
+    }
+    return 0;
+}
+
+
 int main(int argc, char **argv) {
 	int anyErr = 0;
 	unsigned int i;
@@ -201,8 +224,46 @@ int main(int argc, char **argv) {
 		exit(1);
 	}
 
-	queue<hcmNode*> event_queue;
-	queue<hcmInstance*> gate_queue;
+    queue<hcmNode*> event_queue;
+    queue<hcmInstance*> gate_queue;
+
+
+	//parse signals input:
+	hcmSigVec InputSigVec(argv[2],argv[3],verbose);
+	if (!InputSigVec.good()){
+	    //message was already printed while parsing
+	    exit(1);
+	}
+    int res=InputSigVec.readVector();
+	while(res!=0){ //will read until reaches a good line (not empty)
+	    if (res==-1) exit(0); //reached EOF //CHECK
+	    res = InputSigVec.readVector();
+	}
+	vector<hcmPort*> ports = top_cell_flat->getPorts();
+	set<hcmPort*> InputPorts;
+    set< string > signals;
+    bool val;
+    int numOfSignals = InputSigVec.getSignals(signals);
+    if (numOfSignals!=0){
+        vector<hcmPort*>::const_iterator itr = ports.begin();
+        for (itr;itr!=ports.end();itr++){
+            if (signals.find((*itr)->getName())!=signals.end() && (*itr)->getDirection()==IN){  //found the signal. checking direction for safety
+                InputPorts.insert(*itr);
+                hcmNode *currNode = (*itr)->owner();
+                if (InputSigVec.getSigValue((*itr)->getName(),val)!=0){
+                    //could not read signal - handle error (should not happen since signal name is from signals set
+                   //if decide not to handle - delete 'if'
+                }
+                else{
+                    currNode->setProp("value",val); //setting the value of the node. //check if handles buses properly
+                    event_queue.push(currNode); //add to event queue
+                }
+
+            }
+        }
+    }
+
+
 
 	map<string, hcmInstance* >::iterator gate_it = top_cell_flat->getInstances().begin();
 	for(gate_it;gate_it != top_cell_flat->getInstances().end(); gate_it++){
@@ -232,6 +293,8 @@ int main(int argc, char **argv) {
 			gate_queue.pop();
 			process_gate(gate,event_queue);//This gets the node that is pushed by the gate and adds an event if the value is changed
 		}
+		read_next_input(InputSigVec,InputPorts,event_queue); //if needed - add code handling reaching EOF
+
 	}
 
 
