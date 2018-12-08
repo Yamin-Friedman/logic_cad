@@ -4,9 +4,11 @@
 #include <algorithm>
 #include <list>
 #include <queue>
+#include <map>
 #include "hcm.h"
 #include "flat.h"
 #include "hcmsigvec.h"
+#include "hcmvcd.h"
 
 using namespace std;
 
@@ -20,9 +22,9 @@ void process_event(hcmNode* node, queue<hcmInstance*> &gate_queue){
 	if(InstPorts.empty())
 		return;
 	map<string,hcmInstPort*>::const_iterator iter;
-	for (iter=InstPorts.begin();iter!=InstPorts.end();iter++){
+	for (iter=InstPorts.begin();iter!=InstPorts.end();iter++){ //go over node's instPorts
 		hcmPort *port= (*iter).second->getPort();
-		if(port->getDirection()==OUT){
+		if(port->getDirection()==IN){ //if port pushes a gate
 		    hcmInstance* curr_gate = (*iter).second->getInst();
 		    gate_queue.push(curr_gate);
 		}
@@ -171,6 +173,26 @@ int read_next_input(hcmSigVec &InputSigVec,set<hcmPort*> InputPorts, queue<hcmNo
     return 0;
 }
 
+//this function updates ALL the output nodes of the deign in the vcd to their current value. If not necessary, can delete this
+void checkOutputs(set<hcmNode*> outputNodes, vcdFormatter vcd, map<string, hcmNodeCtx*> outputCtx){
+    set<hcmNode*>::const_iterator itr = outputNodes.begin();
+    int currVal;
+    for (itr;itr!=outputNodes.end();itr++){
+        (*itr)->getProp("value",currVal);
+        hcmNodeCtx* ctx = outputCtx.at((*itr)->getName());
+        vcd.changeValue(ctx,(bool)currVal);
+    }
+}
+
+//This function recieves a node , checks if one of design output nodes and if so updates VCD
+void EventIsOutput(hcmNode* currOutNode, set<hcmNode*> outputNodes, vcdFormatter vcd, map<string, hcmNodeCtx*> outputCtx){
+    int Val;
+    if(outputNodes.find(currOutNode)!=outputNodes.end()){ //this really is an output node
+        currOutNode->getProp("value",Val);
+        hcmNodeCtx* ctx = outputCtx.at(currOutNode->getName());
+        vcd.changeValue(ctx,(bool)Val); //update VCD
+    }
+}
 
 int main(int argc, char **argv) {
 	int anyErr = 0;
@@ -217,12 +239,25 @@ int main(int argc, char **argv) {
 
 	hcmCell *top_cell_flat = hcmFlatten(top_cell_name + "_flat",top_cell,globalNodes);
 
+
+	///prepare VCD:///
 	vcdFormatter vcd(top_cell_name + ".vcd", top_cell, globalNodes);
 	if (!vcd.good()) {
 		printf("-E- Could not create vcdFormatter for cell: %s\n",
 		       top_cell_name.c_str());
 		exit(1);
 	}
+    vector<hcmPort*> top_ports = top_cell->getPorts();
+    vector<hcmPort*>::const_iterator pitr = top_ports.begin();
+    set<hcmNode*> outputsNodes; //the set keeps the nodes connected to outputs for easier checks
+    map<string, hcmNodeCtx*> outputCtx; //the map contains the node names and ctx for easier access to vcd
+    for (pitr;pitr!=top_ports.end();pitr++){
+        if(((*pitr)->getDirection())==OUT){  //ports on top cell that are "OUT" should be outputs(?)
+            hcmNodeCtx ctx = new hcmNodeCtx(NULL,(*pitr)->owner());
+            outputCtx.insert((*pitr)->owner()->getName(),&ctx); //the map contains the node names and ctx for easier access to vcd
+            outputsNodes.insert((*pitr)->owner()); //the set keeps the nodes connected to outputs for easier checks
+        }
+    }
 
     queue<hcmNode*> event_queue;
     queue<hcmInstance*> gate_queue;
@@ -285,6 +320,7 @@ int main(int argc, char **argv) {
 		t++;
 		while (!event_queue.empty()) {
 			hcmNode *node = event_queue.front();
+			checkOutputs(node,outputsNodes,vcd,outputCtx); //checks if node is connected to output of design, if so updates vcd
 			event_queue.pop();
 			process_event(node, gate_queue);//This gets the fanout on node and pushes the gates into the gate queue
 		}
@@ -293,16 +329,20 @@ int main(int argc, char **argv) {
 			gate_queue.pop();
 			process_gate(gate,event_queue);//This gets the node that is pushed by the gate and adds an event if the value is changed
 		}
+
 		read_next_input(InputSigVec,InputPorts,event_queue); //if needed - add code handling reaching EOF
 
 	}
 
 
 
-	// Outputs the results into a file
+
+
+	/* Outputs the results into a file
 	ofstream output_file;
 	output_file.open((top_cell_name + ".ranks").c_str(), fstream::out);
 	output_file.close();
+	 */
 
 	delete design;
 }
