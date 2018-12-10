@@ -18,6 +18,8 @@ file(GLOB SOURCES
         hcm.21_10_18/flattener/flat.cc
         hcm.21_10_18/sigvec/*.h
         hcm.21_10_18/sigvec/*.cc
+        hcm.21_10_18/hcm_vcd/*.h
+        hcm.21_10_18/hcm_vcd/*.cc
         )
 
 include_directories(

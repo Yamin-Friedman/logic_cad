@@ -173,7 +173,7 @@ int read_next_input(hcmSigVec &InputSigVec,set<hcmPort*> InputPorts, queue<hcmNo
     return 0;
 }
 
-//this function updates ALL the output nodes of the deign in the vcd to their current value. If not necessary, can delete this
+//this function updates ALL the output nodes of the design in the vcd to their current value. May need to add a check if the value has changed
 void checkOutputs(set<hcmNode*> outputNodes, vcdFormatter vcd, map<string, hcmNodeCtx*> outputCtx){
     set<hcmNode*>::const_iterator itr = outputNodes.begin();
     int currVal;
@@ -185,14 +185,14 @@ void checkOutputs(set<hcmNode*> outputNodes, vcdFormatter vcd, map<string, hcmNo
 }
 
 //This function recieves a node , checks if one of design output nodes and if so updates VCD
-void EventIsOutput(hcmNode* currOutNode, set<hcmNode*> outputNodes, vcdFormatter vcd, map<string, hcmNodeCtx*> outputCtx){
+/*void EventIsOutput(hcmNode* currOutNode, set<hcmNode*> outputNodes, vcdFormatter vcd, map<string, hcmNodeCtx*> outputCtx){
     int Val;
     if(outputNodes.find(currOutNode)!=outputNodes.end()){ //this really is an output node
         currOutNode->getProp("value",Val);
         hcmNodeCtx* ctx = outputCtx.at(currOutNode->getName());
         vcd.changeValue(ctx,(bool)Val); //update VCD
     }
-}
+}*/
 
 int main(int argc, char **argv) {
 	int anyErr = 0;
@@ -249,15 +249,17 @@ int main(int argc, char **argv) {
 	}
     vector<hcmPort*> top_ports = top_cell->getPorts();
     vector<hcmPort*>::const_iterator pitr = top_ports.begin();
+    list<const hcmInstance *> parents; //keep parents empty for top - per instructions on hcmvcd/main
     set<hcmNode*> outputsNodes; //the set keeps the nodes connected to outputs for easier checks
     map<string, hcmNodeCtx*> outputCtx; //the map contains the node names and ctx for easier access to vcd
     for (pitr;pitr!=top_ports.end();pitr++){
         if(((*pitr)->getDirection())==OUT){  //ports on top cell that are "OUT" should be outputs(?)
-            hcmNodeCtx ctx = new hcmNodeCtx(NULL,(*pitr)->owner());
-            outputCtx.insert((*pitr)->owner()->getName(),&ctx); //the map contains the node names and ctx for easier access to vcd
+            hcmNodeCtx *ctx = new hcmNodeCtx(parents,(*pitr)->owner());
+            outputCtx[(*pitr)->owner()->getName()]=ctx; //the map contains the node names and ctx for easier access to vcd
             outputsNodes.insert((*pitr)->owner()); //the set keeps the nodes connected to outputs for easier checks
         }
     }
+    ///done with VCD///
 
     queue<hcmNode*> event_queue;
     queue<hcmInstance*> gate_queue;
@@ -315,24 +317,28 @@ int main(int argc, char **argv) {
 
 	int t = 0;
 	//Simulate vector
-	while (!event_queue.empty() || !gate_queue.empty()){
-		vcd.changeTime(t);
-		t++;
-		while (!event_queue.empty()) {
-			hcmNode *node = event_queue.front();
-			checkOutputs(node,outputsNodes,vcd,outputCtx); //checks if node is connected to output of design, if so updates vcd
-			event_queue.pop();
-			process_event(node, gate_queue);//This gets the fanout on node and pushes the gates into the gate queue
-		}
-		while (!gate_queue.empty()){
-			hcmInstance *gate = gate_queue.front();
-			gate_queue.pop();
-			process_gate(gate,event_queue);//This gets the node that is pushed by the gate and adds an event if the value is changed
-		}
+	while (read_next_input(InputSigVec,InputPorts,event_queue)!=-1){
+	    //simulate:
+        while (!event_queue.empty() || !gate_queue.empty()){
+            vcd.changeTime(t);
+            t++;
+            while (!event_queue.empty()) {
+                hcmNode *node = event_queue.front();
+                event_queue.pop();
+                process_event(node, gate_queue);//This gets the fanout on node and pushes the gates into the gate queue
+            }
+            while (!gate_queue.empty()){
+                hcmInstance *gate = gate_queue.front();
+                gate_queue.pop();
+                process_gate(gate,event_queue);//This gets the node that is pushed by the gate and adds an event if the value is changed
+            }
 
-		read_next_input(InputSigVec,InputPorts,event_queue); //if needed - add code handling reaching EOF
+        }
+        //check outputs:
+        checkOutputs(outputsNodes,vcd,outputCtx);
 
 	}
+
 
 
 

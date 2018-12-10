@@ -10,8 +10,6 @@ all: gl_rank gl_stat
 gl_rank: rank.o 
 	g++ -o $@ $^ $(LDFLAGS) $(HCMPATH)/flattener/flat.o
 
-gl_stat: stat.o
-	g++ -o $@ $^ $(LDFLAGS)
 
 clean:
 	 @ rm *.o gl_stat gl_rank
