@@ -16,8 +16,117 @@ bool verbose = false;
 
 typedef int (*gate_operator)(vector<int>&);
 
+// This struct is used in the set of nodes to allow proper sorting based on rank and name
+struct node_rank_compare {
+	bool operator() (hcmNode* lhs, hcmNode* rhs) const {
+		int rank1, rank2;
+		lhs->getProp("rank",rank1);
+		rhs->getProp("rank",rank2);
+		if (rank1 > rank2)
+			return true;
+		else if (rank1 < rank2)
+			return false;
+		else {
+			string name1, name2;
+			name1 = lhs->getName();
+			name2 = rhs->getName();
+			return name1 < name2;
+		}
+	}
+};
+
+// This struct is used in the set of gates to allow proper sorting based on rank and name
+struct gate_rank_compare {
+	bool operator() (hcmInstance* lhs, hcmInstance* rhs) const {
+		int rank1, rank2;
+		lhs->getProp("rank",rank1);
+		rhs->getProp("rank",rank2);
+		if (rank1 > rank2)
+			return true;
+		else if (rank1 < rank2)
+			return false;
+		else {
+			string name1, name2;
+			name1 = lhs->getName();
+			name2 = rhs->getName();
+			return name1 < name2;
+		}
+	}
+};
+
+// This function checks to see if all the ports leading into this gate have been ranked allowing the rank for this gate to be decided and ranks it accordingly
+bool check_gate_can_be_ranked(hcmInstance &curr_gate){
+	map<string,hcmInstPort*>::iterator it;
+	int rank;
+	int max_rank = 0;
+
+	if(curr_gate.getProp("rank",rank) != NOT_FOUND)
+		return false;
+
+	for (it = curr_gate.getInstPorts().begin(); it != curr_gate.getInstPorts().end(); it++){
+		hcmInstPort *inst_port = (*it).second;
+		if (inst_port->getPort()->getDirection() == IN){
+			if (inst_port->getNode()->getProp("rank",rank) == NOT_FOUND)
+				return false;
+			else
+			if (rank > max_rank)
+				max_rank = rank;
+		}
+	}
+	curr_gate.setProp("rank",max_rank);
+	return true;
+}
+
+void rank_hcm_design(hcmCell *top_cell){
+	list<hcmNode*> node_list;
+	list<hcmInstance*> gate_list;
+
+	map<string,hcmNode*>::iterator NI;
+
+	// Give a rank of 0 to all the input nodes
+	for (NI = top_cell->getNodes().begin();NI != top_cell->getNodes().end();NI++){
+		if ((*NI).second->getPort() && (*NI).second->getPort()->getDirection() == IN){
+			(*NI).second->setProp("rank",0);
+			node_list.push_back((*NI).second);
+		}
+	}
+
+	// Loops until all the gates and nodes in the flat model are ranked
+	while(!node_list.empty() || !gate_list.empty()){
+		list<hcmNode*>::iterator NVI;
+		for (NVI = node_list.begin();NVI != node_list.end();){
+			map<string,hcmInstPort*>::iterator instp_MI;
+			// Goes over all of the nodes that have just been ranked and checks to see if the gates attached to them can be ranked
+			for (instp_MI = (*NVI)->getInstPorts().begin(); instp_MI != (*NVI)->getInstPorts().end();instp_MI++){
+				hcmInstance *curr_gate = (*instp_MI).second->getInst();
+				if(check_gate_can_be_ranked(*curr_gate)){
+					int rank;
+					curr_gate->getProp("rank",rank);
+					gate_list.push_back(curr_gate);
+				}
+			}
+			node_list.erase(NVI++);
+		}
+		list<hcmInstance*>::iterator inst_VI;
+		for (inst_VI = gate_list.begin(); inst_VI != gate_list.end();){
+			map<string,hcmInstPort*>::iterator instp_MI;
+			// Loops over all the gates that have just been ranked and ranks any previously unranked nodes connected to them and adds them to the nodes list
+			for (instp_MI = (*inst_VI)->getInstPorts().begin(); instp_MI != (*inst_VI)->getInstPorts().end(); instp_MI++){
+				hcmNode *curr_node = (*instp_MI).second->getNode();
+				int rank;
+				if(curr_node->getProp("rank",rank) == NOT_FOUND){
+					(*inst_VI)->getProp("rank",rank);
+					curr_node->setProp("rank",rank + 1);
+					node_list.push_back(curr_node);
+				}
+			}
+			gate_list.erase(inst_VI++);
+		}
+	}
+}
+
 //This gets the fanout on node and pushes the gates into the gate
-void process_event(hcmNode* node, queue<hcmInstance*> &gate_queue){
+void process_event(hcmNode* node, priority_queue<hcmInstance*, vector<hcmInstance*>, gate_rank_compare> &gate_queue){
 	map<string, hcmInstPort* > InstPorts = node->getInstPorts();
 	if(InstPorts.empty())
 		return;
@@ -124,7 +233,7 @@ gate_operator get_gate_type(string gate_name){
 	}
 }
 
-void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue){
+void process_gate(hcmInstance *gate,priority_queue<hcmNode*, vector<hcmNode*>, node_rank_compare> &event_queue){
 	vector<int> input_vals;
 	hcmNode *output_node;
 	int output_value, old_output_value;
@@ -152,7 +261,7 @@ void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue){
 	}
 }
 
-int read_next_input(hcmSigVec &InputSigVec,set<hcmPort*> InputPorts, queue<hcmNode*> &event_queue) { //this function reads the next line, updates event_queue
+int read_next_input(hcmSigVec &InputSigVec,set<hcmPort*> InputPorts, priority_queue<hcmNode*, vector<hcmNode*>, node_rank_compare> &event_queue) { //this function reads the next line, updates event_queue
 
     int res = InputSigVec.readVector();
     while (res != 0) { //will read until reaches a good line (not empty)
@@ -174,7 +283,7 @@ int read_next_input(hcmSigVec &InputSigVec,set<hcmPort*> InputPorts, queue<hcmNo
 }
 
 //this function updates ALL the output nodes of the design in the vcd to their current value. May need to add a check if the value has changed
-void checkOutputs(set<hcmNode*> outputNodes, vcdFormatter vcd, map<string, hcmNodeCtx*> outputCtx){
+void checkOutputs(set<hcmNode*> &outputNodes, vcdFormatter &vcd, map<string, hcmNodeCtx*> &outputCtx){
     set<hcmNode*>::const_iterator itr = outputNodes.begin();
     int currVal;
     for (itr;itr!=outputNodes.end();itr++){
@@ -261,8 +370,11 @@ int main(int argc, char **argv) {
     }
     ///done with VCD///
 
-    queue<hcmNode*> event_queue;
-    queue<hcmInstance*> gate_queue;
+	///Ranks all the nodes and gates in the flattened design to aid in processing in the right order
+	rank_hcm_design(top_cell_flat);
+
+    priority_queue<hcmNode*, vector<hcmNode*>, node_rank_compare> event_queue;
+	priority_queue<hcmInstance*, vector<hcmInstance*>, gate_rank_compare> gate_queue;
 
 
 	//parse signals input:
@@ -323,12 +435,12 @@ int main(int argc, char **argv) {
             vcd.changeTime(t);
             t++;
             while (!event_queue.empty()) {
-                hcmNode *node = event_queue.front();
+                hcmNode *node = event_queue.top();
                 event_queue.pop();
                 process_event(node, gate_queue);//This gets the fanout on node and pushes the gates into the gate queue
             }
             while (!gate_queue.empty()){
-                hcmInstance *gate = gate_queue.front();
+                hcmInstance *gate = gate_queue.top();
                 gate_queue.pop();
                 process_gate(gate,event_queue);//This gets the node that is pushed by the gate and adds an event if the value is changed
             }
@@ -336,7 +448,6 @@ int main(int argc, char **argv) {
         }
         //check outputs:
         checkOutputs(outputsNodes,vcd,outputCtx);
-
 	}
 
 

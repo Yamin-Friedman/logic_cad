@@ -7,6 +7,7 @@
 #include <sstream>
 #include <algorithm>
 #include "hcmvcd.h"
+#include <time.h>
 
 using namespace std;
 
