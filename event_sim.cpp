@@ -174,7 +174,7 @@ int read_next_input(hcmSigVec &InputSigVec,set<hcmPort*> InputPorts, queue<hcmNo
 }
 
 //this function updates ALL the output nodes of the design in the vcd to their current value. May need to add a check if the value has changed
-void checkOutputs(set<hcmNode*> outputNodes, vcdFormatter vcd, map<string, hcmNodeCtx*> outputCtx){
+void checkOutputs(set<hcmNode*> &outputNodes, vcdFormatter &vcd, map<string, hcmNodeCtx*> &outputCtx){
     set<hcmNode*>::const_iterator itr = outputNodes.begin();
     int currVal;
     for (itr;itr!=outputNodes.end();itr++){
