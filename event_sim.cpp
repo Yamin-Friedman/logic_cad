@@ -100,6 +100,17 @@ int xor_func(vector<int>& input_vec){
 	return res;
 }
 
+// FF_func:
+int FF_func(vector<int>& input_vec){
+	int res = input_vec[0];
+
+	for(int i = 1;i < input_vec.size();i++){
+		res ^= input_vec[i];
+	}
+
+	return res;
+}
+
 gate_operator get_gate_type(string gate_name){
 	if(gate_name.find("buffer") != string::npos){
 		return buffer_func;
@@ -121,6 +132,9 @@ gate_operator get_gate_type(string gate_name){
 	}
 	if(gate_name.find("or") != string::npos){
 		return or_func;
+	}
+	if(gate_name.find("ff") != string::npos){
+		return FF_func;
 	}
 }
 
@@ -325,25 +339,36 @@ int main(int argc, char **argv) {
 	string top_cell_name;
 
 	// Parse input
-	if (argc < 4) {
-		anyErr++;
-	} else {
-		top_cell_name = argv[1];
+//	if (argc < 4) {
+//		anyErr++;
+//	} else {
+//		top_cell_name = argv[1];
+//
+//		for (int argIdx = 4;argIdx < argc; argIdx++) {
+//			vlgFiles.push_back(argv[argIdx]);
+//		}
+//
+//		if (vlgFiles.size() < 1) {
+//			cerr << "-E- At least top-level and single verilog file required for spec model" << endl;
+//			anyErr++;
+//		}
+//	}
+//
+//	if (anyErr) {
+//		cerr << "Usage: " << argv[0] << "  [-v] top-cell file1.v [file2.v] ... \n";
+//		exit(1);
+//	}
 
-		for (int argIdx = 4;argIdx < argc; argIdx++) {
-			vlgFiles.push_back(argv[argIdx]);
-		}
-
-		if (vlgFiles.size() < 1) {
-			cerr << "-E- At least top-level and single verilog file required for spec model" << endl;
-			anyErr++;
-		}
-	}
-
-	if (anyErr) {
-		cerr << "Usage: " << argv[0] << "  [-v] top-cell file1.v [file2.v] ... \n";
-		exit(1);
-	}
+	cin >> top_cell_name;
+	string sig1;
+	cin >> sig1;
+	string sig2;
+	cin >> sig2;
+	string file;
+	cin >> file;
+	vlgFiles.push_back(file);
+	cin >> file;
+	vlgFiles.push_back(file);
 
 	// Build HCM design
 	set< string> globalNodes;
@@ -365,24 +390,25 @@ int main(int argc, char **argv) {
 
 
 	///prepare VCD:///
-	vcdFormatter vcd(top_cell_name + ".vcd", top_cell, globalNodes);
+	vcdFormatter vcd(top_cell_name + ".vcd", top_cell_flat, globalNodes);
 	if (!vcd.good()) {
 		printf("-E- Could not create vcdFormatter for cell: %s\n",
 		       top_cell_name.c_str());
 		exit(1);
 	}
-    vector<hcmPort*> top_ports = top_cell->getPorts();
+    vector<hcmPort*> top_ports = top_cell_flat->getPorts();
     vector<hcmPort*>::const_iterator pitr = top_ports.begin();
     list<const hcmInstance *> parents; //keep parents empty for top - per instructions on hcmvcd/main
     set<hcmNode*> outputsNodes; //the set keeps the nodes connected to outputs for easier checks
     map<string, hcmNodeCtx*> outputCtx; //the map contains the node names and ctx for easier access to vcd
     for (pitr;pitr!=top_ports.end();pitr++){
-        if(((*pitr)->getDirection())==OUT){  //ports on top cell that are "OUT" should be outputs(?)
+//        if(((*pitr)->getDirection())==OUT){  //ports on top cell that are "OUT" should be outputs(?)
             hcmNodeCtx *ctx = new hcmNodeCtx(parents,(*pitr)->owner());
             outputCtx[(*pitr)->owner()->getName()]=ctx; //the map contains the node names and ctx for easier access to vcd
             outputsNodes.insert((*pitr)->owner()); //the set keeps the nodes connected to outputs for easier checks
-        }
+ //       }
     }
+
     ///done with VCD///
 
     queue<hcmNode*> event_queue;
@@ -390,7 +416,8 @@ int main(int argc, char **argv) {
 
 
 	//parse signals input:
-	hcmSigVec InputSigVec(argv[2],argv[3],verbose);
+//	hcmSigVec InputSigVec(argv[2],argv[3],verbose); // temp
+	hcmSigVec InputSigVec(sig1,sig2,verbose);
 	if (!InputSigVec.good()){
 	    //message was already printed while parsing
 	    exit(1);
@@ -429,7 +456,7 @@ int main(int argc, char **argv) {
 	map<string, hcmInstance* >::iterator gate_it = top_cell_flat->getInstances().begin();
 	for(gate_it;gate_it != top_cell_flat->getInstances().end(); gate_it++){
 		hcmInstance *gate = (*gate_it).second;
-		gate_operator gate_type = get_gate_type(gate->getName());
+		gate_operator gate_type = get_gate_type(gate->masterCell()->getName());
 		gate->setProp("gate_type",gate_type);
 	}
 
@@ -439,13 +466,12 @@ int main(int argc, char **argv) {
 		node->setProp("value",0);
 	}
 
-	int t = 0;
+	int t = 1;
+	checkOutputs(outputsNodes,vcd,outputCtx);
 	//Simulate vector
 	while (read_next_input(InputSigVec,InputPorts,event_queue)!=-1){
 	    //simulate:
         while (!event_queue.empty() || !gate_queue.empty()){
-            vcd.changeTime(t);
-            t++;
             while (!event_queue.empty()) {
                 hcmNode *node = event_queue.front();
                 event_queue.pop();
@@ -456,10 +482,11 @@ int main(int argc, char **argv) {
                 gate_queue.pop();
                 process_gate(gate,event_queue, gate_queue);//This gets the node that is pushed by the gate and adds an event if the value is changed
             }
-
         }
         //check outputs:
         checkOutputs(outputsNodes,vcd,outputCtx);
+		vcd.changeTime(t);
+		t++;
 
 	}
 
@@ -474,5 +501,5 @@ int main(int argc, char **argv) {
 	output_file.close();
 	 */
 
-	delete design;
+//	delete design;
 }
