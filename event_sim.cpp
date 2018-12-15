@@ -124,7 +124,119 @@ gate_operator get_gate_type(string gate_name){
 	}
 }
 
-void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue){
+void handle_FF_NOR_loop(hcmInstance *first_NOR, hcmInstance *second_NOR, queue<hcmInstance*> &gate_queue){
+
+	// We must find out which is the output NOR
+	hcmInstance *output_NOR = first_NOR;
+	hcmInstance *inner_NOR = second_NOR;
+	map< string , hcmInstPort *>::iterator inst_port_it = first_NOR->getInstPorts().begin();
+	for(;inst_port_it != first_NOR->getInstPorts().end();inst_port_it++) {
+		hcmInstPort *inst_port = (*inst_port_it).second;
+		hcmNode *node = inst_port->getNode();
+		if(inst_port->getPort()->getDirection() == OUT){
+			if (node->getInstPorts().size() > 2) {
+				break;
+			}
+			else {
+				output_NOR = second_NOR;
+				inner_NOR = first_NOR;
+			}
+		}
+	}
+
+	// Handle the loop and push output gates to the gate queue
+	second_NOR->setProp("handled",true);
+	// get inputs
+	vector<int> first_input_vals, second_input_vals;
+
+	inst_port_it = first_NOR->getInstPorts().begin();
+	for(;inst_port_it != first_NOR->getInstPorts().end();inst_port_it++){
+		hcmInstPort *inst_port = (*inst_port_it).second;
+		hcmNode *node = inst_port->getNode();
+		if(inst_port->getPort()->getDirection() == IN){
+			int val;
+			node->getProp("value",val);
+			first_input_vals.emplace_back(val);
+		}
+	}
+
+	inst_port_it = second_NOR->getInstPorts().begin();
+	for(;inst_port_it != second_NOR->getInstPorts().end();inst_port_it++){
+		hcmInstPort *inst_port = (*inst_port_it).second;
+		hcmNode *node = inst_port->getNode();
+		if(inst_port->getPort()->getDirection() == IN){
+			int val;
+			node->getProp("value",val);
+			second_input_vals.emplace_back(val);
+		}
+	}
+
+	int out_1 = nor_func(first_input_vals);
+	int out_2 = nor_func(second_input_vals);
+
+
+}
+
+// This function checks to see if we have a NOR loop such as appears only in the FF model and returns the second NOR if true.
+hcmInstance *is_FF_NOR(hcmInstance *gate) {
+	hcmNode *output_node;
+	hcmInstance *second_NOR = NULL;
+	gate_operator gate_func;
+
+	map< string , hcmInstPort *>::iterator inst_port_it = gate->getInstPorts().begin();
+	for(;inst_port_it != gate->getInstPorts().end();inst_port_it++) {
+		hcmInstPort *inst_port = (*inst_port_it).second;
+		hcmNode *node = inst_port->getNode();
+		if(inst_port->getPort()->getDirection() == OUT){
+			output_node = node;
+			break;
+		}
+	}
+
+	inst_port_it = output_node->getInstPorts().begin();
+	for(;inst_port_it != output_node->getInstPorts().end();inst_port_it++) {
+		hcmInstPort *inst_port = (*inst_port_it).second;
+		hcmInstance *gate_tmp = inst_port->getInst();
+		if(inst_port->getPort()->getDirection() == OUT){
+			gate_tmp->getProp("gate_type",gate_func);
+			if (gate_func == nor_func){
+				second_NOR = gate_tmp;
+			}
+		}
+	}
+
+	if (second_NOR == NULL){
+		return NULL;
+	}
+
+	inst_port_it = second_NOR->getInstPorts().begin();
+	for(;inst_port_it != second_NOR->getInstPorts().end();inst_port_it++) {
+		hcmInstPort *inst_port = (*inst_port_it).second;
+		hcmNode *node = inst_port->getNode();
+		if(inst_port->getPort()->getDirection() == OUT){
+			output_node = node;
+			break;
+		}
+	}
+
+	inst_port_it = output_node->getInstPorts().begin();
+	for(;inst_port_it != output_node->getInstPorts().end();inst_port_it++) {
+		hcmInstPort *inst_port = (*inst_port_it).second;
+		hcmInstance *gate_tmp = inst_port->getInst();
+		if(inst_port->getPort()->getDirection() == OUT){
+			gate_tmp->getProp("gate_type",gate_func);
+			if (gate_func == nor_func){
+				if (gate_tmp == gate){
+					return second_NOR;
+				}
+			}
+		}
+	}
+
+	return NULL;
+}
+
+void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue, queue<hcmInstance*> &gate_queue){
 	vector<int> input_vals;
 	hcmNode *output_node;
 	int output_value, old_output_value;
@@ -144,6 +256,18 @@ void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue){
 		}
 	}
 	gate->getProp("gate_type",gate_func);
+	if (gate_func == nor_func) {
+		bool handled;
+		if(gate->getProp("handled",handled) == OK && handled == true) {
+			gate->setProp("handled",false);
+			return;
+		}
+		hcmInstance *second_NOR = is_FF_NOR(gate);
+		if (second_NOR != NULL){
+			handle_FF_NOR_loop(gate,second_NOR,gate_queue);
+			return;
+		}
+	}
 	output_value = gate_func(input_vals);
 	output_node->getProp("value",old_output_value);
 	if(output_value != old_output_value){
@@ -330,7 +454,7 @@ int main(int argc, char **argv) {
             while (!gate_queue.empty()){
                 hcmInstance *gate = gate_queue.front();
                 gate_queue.pop();
-                process_gate(gate,event_queue);//This gets the node that is pushed by the gate and adds an event if the value is changed
+                process_gate(gate,event_queue, gate_queue);//This gets the node that is pushed by the gate and adds an event if the value is changed
             }
 
         }
