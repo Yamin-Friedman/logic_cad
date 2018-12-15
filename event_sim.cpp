@@ -156,7 +156,7 @@ void handle_FF_NOR_loop(hcmInstance *first_NOR, hcmInstance *second_NOR, queue<h
 		if(inst_port->getPort()->getDirection() == IN){
 			int val;
 			node->getProp("value",val);
-			first_input_vals.emplace_back(val);
+			first_input_vals.push_back(val);
 		}
 	}
 
@@ -167,7 +167,7 @@ void handle_FF_NOR_loop(hcmInstance *first_NOR, hcmInstance *second_NOR, queue<h
 		if(inst_port->getPort()->getDirection() == IN){
 			int val;
 			node->getProp("value",val);
-			second_input_vals.emplace_back(val);
+			second_input_vals.push_back(val);
 		}
 	}
 
@@ -250,7 +250,7 @@ void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue, queue<hcmInsta
 		if(inst_port->getPort()->getDirection() == IN){
 			int val;
 			node->getProp("value",val);
-			input_vals.emplace_back(val);
+			input_vals.push_back(val);
 		} else{
 			output_node = node;
 		}
