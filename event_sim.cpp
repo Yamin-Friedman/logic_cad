@@ -286,6 +286,7 @@ void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue, queue<hcmInsta
 	output_node->getProp("value",old_output_value);
 	if(output_value != old_output_value){
 		output_node->setProp("value",output_value);
+		output_node->setProp("prev value",old_output_value);
 		event_queue.push(output_node);
 	}
 }
@@ -314,23 +315,17 @@ int read_next_input(hcmSigVec &InputSigVec,set<hcmPort*> InputPorts, queue<hcmNo
 //this function updates ALL the output nodes of the design in the vcd to their current value. May need to add a check if the value has changed
 void checkOutputs(set<hcmNode*> &outputNodes, vcdFormatter &vcd, map<string, hcmNodeCtx*> &outputCtx){
     set<hcmNode*>::const_iterator itr = outputNodes.begin();
-    int currVal;
+    bool currVal;
+	bool prevVal;
     for (itr;itr!=outputNodes.end();itr++){
         (*itr)->getProp("value",currVal);
+	    (*itr)->getProp("prev value",prevVal);
         hcmNodeCtx* ctx = outputCtx.at((*itr)->getName());
-        vcd.changeValue(ctx,(bool)currVal);
+	    if (currVal != prevVal)
+            vcd.changeValue(ctx,currVal);
     }
 }
 
-//This function recieves a node , checks if one of design output nodes and if so updates VCD
-/*void EventIsOutput(hcmNode* currOutNode, set<hcmNode*> outputNodes, vcdFormatter vcd, map<string, hcmNodeCtx*> outputCtx){
-    int Val;
-    if(outputNodes.find(currOutNode)!=outputNodes.end()){ //this really is an output node
-        currOutNode->getProp("value",Val);
-        hcmNodeCtx* ctx = outputCtx.at(currOutNode->getName());
-        vcd.changeValue(ctx,(bool)Val); //update VCD
-    }
-}*/
 
 int main(int argc, char **argv) {
 	int anyErr = 0;
@@ -396,17 +391,17 @@ int main(int argc, char **argv) {
 		       top_cell_name.c_str());
 		exit(1);
 	}
-    vector<hcmPort*> top_ports = top_cell_flat->getPorts();
-    vector<hcmPort*>::const_iterator pitr = top_ports.begin();
+	map<string, hcmNode*> top_nodes = top_cell->getNodes();
+	map<string, hcmNode*>::const_iterator pitr = top_nodes.begin();
     list<const hcmInstance *> parents; //keep parents empty for top - per instructions on hcmvcd/main
     set<hcmNode*> outputsNodes; //the set keeps the nodes connected to outputs for easier checks
     map<string, hcmNodeCtx*> outputCtx; //the map contains the node names and ctx for easier access to vcd
-    for (pitr;pitr!=top_ports.end();pitr++){
-//        if(((*pitr)->getDirection())==OUT){  //ports on top cell that are "OUT" should be outputs(?)
-            hcmNodeCtx *ctx = new hcmNodeCtx(parents,(*pitr)->owner());
-            outputCtx[(*pitr)->owner()->getName()]=ctx; //the map contains the node names and ctx for easier access to vcd
-            outputsNodes.insert((*pitr)->owner()); //the set keeps the nodes connected to outputs for easier checks
- //       }
+    for (pitr;pitr!=top_nodes.end();pitr++){
+	    if (globalNodes.find((*pitr).second->getName()) != globalNodes.end())
+		    continue;
+	    hcmNodeCtx *ctx = new hcmNodeCtx(parents,top_cell_flat->getNode((*pitr).second->getName()));
+	    outputCtx[(*pitr).second->getName()]=ctx; //the map contains the node names and ctx for easier access to vcd
+	    outputsNodes.insert(top_cell_flat->getNode((*pitr).second->getName())); //the set keeps the nodes connected to outputs for easier checks
     }
 
     ///done with VCD///
@@ -443,7 +438,8 @@ int main(int argc, char **argv) {
                    //if decide not to handle - delete 'if'
                 }
                 else{
-                    currNode->setProp("value",val); //setting the value of the node. //check if handles buses properly
+                    currNode->setProp("value",val); //setting the value of the node.
+	                currNode->setProp("prev value",val);
                     event_queue.push(currNode); //add to event queue
                 }
 
@@ -463,11 +459,15 @@ int main(int argc, char **argv) {
 	map<string, hcmNode* >::iterator node_it = top_cell_flat->getNodes().begin();
 	for(;node_it != top_cell_flat->getNodes().end(); node_it++){
 		hcmNode *node = (*node_it).second;
-		node->setProp("value",0);
+		if (globalNodes.find(node->getName()) != globalNodes.end())
+			continue;
+		node->setProp("value", false);
+		node->setProp("prev value", false);
+		hcmNodeCtx* ctx = outputCtx.at(node->getName());
+		vcd.changeValue(ctx,false);
 	}
 
 	int t = 1;
-	checkOutputs(outputsNodes,vcd,outputCtx);
 	//Simulate vector
 	while (read_next_input(InputSigVec,InputPorts,event_queue)!=-1){
 	    //simulate:
@@ -484,22 +484,11 @@ int main(int argc, char **argv) {
             }
         }
         //check outputs:
-        checkOutputs(outputsNodes,vcd,outputCtx);
 		vcd.changeTime(t);
 		t++;
+        checkOutputs(outputsNodes,vcd,outputCtx);
 
 	}
-
-
-
-
-
-
-	/* Outputs the results into a file
-	ofstream output_file;
-	output_file.open((top_cell_name + ".ranks").c_str(), fstream::out);
-	output_file.close();
-	 */
 
 //	delete design;
 }
