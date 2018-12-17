@@ -102,13 +102,7 @@ int xor_func(vector<int>& input_vec){
 
 // FF_func:
 int FF_func(vector<int>& input_vec){
-	int res = input_vec[0];
-
-	for(int i = 1;i < input_vec.size();i++){
-		res ^= input_vec[i];
-	}
-
-	return res;
+	return 0;
 }
 
 gate_operator get_gate_type(string gate_name){
@@ -283,15 +277,15 @@ void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue, queue<hcmInsta
 		}
 	}
 	output_value = gate_func(input_vals);
-	output_node->getProp("value",old_output_value);
-	if(output_value != old_output_value){
-		output_node->setProp("value",output_value);
-		output_node->setProp("prev value",old_output_value);
+	output_node->getProp("value", old_output_value);
+	if (output_value != old_output_value) {
+		output_node->setProp("value", output_value);
+		output_node->setProp("prev value", old_output_value);
 		event_queue.push(output_node);
 	}
 }
 
-int read_next_input(hcmSigVec &InputSigVec,set<hcmPort*> InputPorts, queue<hcmNode*> &event_queue) { //this function reads the next line, updates event_queue
+int read_next_input(hcmSigVec &InputSigVec,set<hcmNode*> InputNodes, queue<hcmNode*> &event_queue) { //this function reads the next line, updates event_queue
 
     int res = InputSigVec.readVector();
     while (res != 0) { //will read until reaches a good line (not empty)
@@ -299,14 +293,17 @@ int read_next_input(hcmSigVec &InputSigVec,set<hcmPort*> InputPorts, queue<hcmNo
         res = InputSigVec.readVector();
     }
     bool val;
-    set<hcmPort *>::const_iterator itr = InputPorts.begin();
-    for (itr; itr != InputPorts.end(); itr++) {
-        hcmNode *currNode = (*itr)->owner();
+	bool prev_val;
+    set<hcmNode *>::const_iterator itr = InputNodes.begin();
+    for (itr; itr != InputNodes.end(); itr++) {
+        hcmNode *currNode = (*itr);
         if (InputSigVec.getSigValue((*itr)->getName(),val)!=0){
             //could not read signal - handle error (should not happen since signal name is from signals set
             return -1; //may need to change
         }
-        currNode->setProp("value",val); //setting the value of the node. //check if handles buses properly
+	    currNode->getProp("value",prev_val);
+	    currNode->setProp("prev value",prev_val);
+        currNode->setProp("value",val); //setting the value of the node.
         event_queue.push(currNode); //add to event queue
     }
     return 0;
@@ -423,28 +420,30 @@ int main(int argc, char **argv) {
 	    res = InputSigVec.readVector();
 	}
 	vector<hcmPort*> ports = top_cell_flat->getPorts();
-	set<hcmPort*> InputPorts;
+	set<hcmNode*> InputNodes;
     set< string > signals;
     bool val;
     int numOfSignals = InputSigVec.getSignals(signals);
     if (numOfSignals!=0){
-        vector<hcmPort*>::const_iterator itr = ports.begin();
-        for (itr;itr!=ports.end();itr++){
-            if (signals.find((*itr)->getName())!=signals.end() && (*itr)->getDirection()==IN){  //found the signal. checking direction for safety
-                InputPorts.insert(*itr);
-                hcmNode *currNode = (*itr)->owner();
-                if (InputSigVec.getSigValue((*itr)->getName(),val)!=0){
-                    //could not read signal - handle error (should not happen since signal name is from signals set
-                   //if decide not to handle - delete 'if'
-                }
-                else{
-                    currNode->setProp("value",val); //setting the value of the node.
-	                currNode->setProp("prev value",val);
-                    event_queue.push(currNode); //add to event queue
-                }
+	    set<string>::iterator it = signals.begin();
+	    for (it; it != signals.end(); it++){
+		    InputNodes.insert(top_cell_flat->getNodes()[(*it)]);
+	    }
+//        vector<hcmPort*>::const_iterator itr = ports.begin();
+//        for (itr;itr!=ports.end();itr++){
+//            if (signals.find((*itr)->getName())!=signals.end() && (*itr)->getDirection()==IN){  //found the signal. checking direction for safety
+//                InputPorts.insert(*itr);
+//                hcmNode *currNode = (*itr)->owner();
+//                if (InputSigVec.getSigValue((*itr)->getName(),val)!=0){
+//                    //could not read signal - handle error (should not happen since signal name is from signals set
+//                   //if decide not to handle - delete 'if'
+//                }
+//                else{
+//                    currNode->setProp("value",val); //setting the value of the node.
+//	                currNode->setProp("prev value",val);
+//                    event_queue.push(currNode); //add to event queue
+//                }
 
-            }
-        }
     }
 
 
@@ -469,7 +468,7 @@ int main(int argc, char **argv) {
 
 	int t = 1;
 	//Simulate vector
-	while (read_next_input(InputSigVec,InputPorts,event_queue)!=-1){
+	while (read_next_input(InputSigVec,InputNodes,event_queue)!=-1){
 	    //simulate:
         while (!event_queue.empty() || !gate_queue.empty()){
             while (!event_queue.empty()) {
