@@ -14,7 +14,7 @@ using namespace std;
 
 bool verbose = false;
 
-typedef int (*gate_operator)(vector<int>&);
+typedef bool (*gate_operator)(vector<bool>&);
 
 //This gets the fanout on node and pushes the gates into the gate
 void process_event(hcmNode* node, queue<hcmInstance*> &gate_queue){
@@ -32,21 +32,21 @@ void process_event(hcmNode* node, queue<hcmInstance*> &gate_queue){
 }
 
 // inv_func: Inverts the input
-int inv_func(vector<int>& input_vec){
+bool inv_func(vector<bool>& input_vec){
 	int res = input_vec[0];
 
 	return !res;
 }
 
 // buffer_func: returns the input
-int buffer_func(vector<int>& input_vec){
+bool buffer_func(vector<bool>& input_vec){
 	int res = input_vec[0];
 
 	return res;
 }
 
 // or_func: Computes OR between all the inputs received in the input_vec
-int or_func(vector<int>& input_vec){
+bool or_func(vector<bool>& input_vec){
 	int res = input_vec[0];
 
 	for(int i = 1;i < input_vec.size();i++){
@@ -57,7 +57,7 @@ int or_func(vector<int>& input_vec){
 }
 
 // nor_func: Computes NOR between all the inputs received in the input_vec
-int nor_func(vector<int>& input_vec){
+bool nor_func(vector<bool>& input_vec){
 	int res = input_vec[0];
 
 	for(int i = 1;i < input_vec.size();i++){
@@ -68,7 +68,7 @@ int nor_func(vector<int>& input_vec){
 }
 
 // and_func: Computes AND between all the inputs received in the input_vec
-int and_func(vector<int>& input_vec){
+bool and_func(vector<bool>& input_vec){
 	int res = input_vec[0];
 
 	for(int i = 1;i < input_vec.size();i++){
@@ -79,7 +79,7 @@ int and_func(vector<int>& input_vec){
 }
 
 // nand_func: Computes NAND between all the inputs received in the input_vec
-int nand_func(vector<int>& input_vec){
+bool nand_func(vector<bool>& input_vec){
 	int res = input_vec[0];
 
 	for(int i = 1;i < input_vec.size();i++){
@@ -90,7 +90,7 @@ int nand_func(vector<int>& input_vec){
 }
 
 // xor_func: Computes XOR between all the inputs received in the input_vec
-int xor_func(vector<int>& input_vec){
+bool xor_func(vector<bool>& input_vec){
 	int res = input_vec[0];
 
 	for(int i = 1;i < input_vec.size();i++){
@@ -101,8 +101,12 @@ int xor_func(vector<int>& input_vec){
 }
 
 // FF_func:
-int FF_func(vector<int>& input_vec){
-	return 0;
+bool FF_func(vector<bool>& input_vec){
+	if (input_vec[1] == true){
+		return input_vec[0];
+	} else {
+		return input_vec[2];
+	}
 }
 
 gate_operator get_gate_type(string gate_name){
@@ -155,14 +159,14 @@ void handle_FF_NOR_loop(hcmInstance *first_NOR, hcmInstance *second_NOR, queue<h
 	// Handle the loop and push output gates to the gate queue
 	second_NOR->setProp("handled",true);
 	// get inputs
-	vector<int> first_input_vals, second_input_vals;
+	vector<bool> first_input_vals, second_input_vals;
 
 	inst_port_it = first_NOR->getInstPorts().begin();
 	for(;inst_port_it != first_NOR->getInstPorts().end();inst_port_it++){
 		hcmInstPort *inst_port = (*inst_port_it).second;
 		hcmNode *node = inst_port->getNode();
 		if(inst_port->getPort()->getDirection() == IN){
-			int val;
+			bool val;
 			node->getProp("value",val);
 			first_input_vals.emplace_back(val);
 		}
@@ -173,7 +177,7 @@ void handle_FF_NOR_loop(hcmInstance *first_NOR, hcmInstance *second_NOR, queue<h
 		hcmInstPort *inst_port = (*inst_port_it).second;
 		hcmNode *node = inst_port->getNode();
 		if(inst_port->getPort()->getDirection() == IN){
-			int val;
+			bool val;
 			node->getProp("value",val);
 			second_input_vals.emplace_back(val);
 		}
@@ -245,25 +249,41 @@ hcmInstance *is_FF_NOR(hcmInstance *gate) {
 }
 
 void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue, queue<hcmInstance*> &gate_queue){
-	vector<int> input_vals;
+	vector<bool> input_vals;
 	hcmNode *output_node;
-	int output_value, old_output_value;
+	bool output_value, old_output_value;
 	gate_operator gate_func;
+	gate->getProp("gate_type",gate_func);
+	input_vals.resize(3);
 
 	map< string , hcmInstPort *>::iterator inst_port_it = gate->getInstPorts().begin();
 
 	for(;inst_port_it != gate->getInstPorts().end();inst_port_it++){
 		hcmInstPort *inst_port = (*inst_port_it).second;
 		hcmNode *node = inst_port->getNode();
+		bool val;
 		if(inst_port->getPort()->getDirection() == IN){
-			int val;
 			node->getProp("value",val);
+			if (gate_func == FF_func){
+				hcmPort *port = inst_port->getPort();
+				hcmNode *port_node = port->owner();
+				if (port_node->getName() == "D"){
+					input_vals[0] = val;
+				} else if ( port_node->getName() == "CLK") {
+					input_vals[1] = val;
+				}
+				continue;
+			}
 			input_vals.emplace_back(val);
 		} else{
 			output_node = node;
+			if (gate_func == FF_func) {
+				node->getProp("value",val);
+				input_vals[2] = val;
+			}
 		}
 	}
-	gate->getProp("gate_type",gate_func);
+
 	if (gate_func == nor_func) {
 		bool handled;
 		if(gate->getProp("handled",handled) == OK && handled == true) {
@@ -280,7 +300,6 @@ void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue, queue<hcmInsta
 	output_node->getProp("value", old_output_value);
 	if (output_value != old_output_value) {
 		output_node->setProp("value", output_value);
-		output_node->setProp("prev value", old_output_value);
 		event_queue.push(output_node);
 	}
 }
@@ -302,7 +321,6 @@ int read_next_input(hcmSigVec &InputSigVec,set<hcmNode*> InputNodes, queue<hcmNo
             return -1; //may need to change
         }
 	    currNode->getProp("value",prev_val);
-	    currNode->setProp("prev value",prev_val);
         currNode->setProp("value",val); //setting the value of the node.
         event_queue.push(currNode); //add to event queue
     }
@@ -318,8 +336,10 @@ void checkOutputs(set<hcmNode*> &outputNodes, vcdFormatter &vcd, map<string, hcm
         (*itr)->getProp("value",currVal);
 	    (*itr)->getProp("prev value",prevVal);
         hcmNodeCtx* ctx = outputCtx.at((*itr)->getName());
-	    if (currVal != prevVal)
-            vcd.changeValue(ctx,currVal);
+	    if (currVal != prevVal) {
+		    vcd.changeValue(ctx, currVal);
+		    (*itr)->setProp("prev val",currVal);
+	    }
     }
 }
 
@@ -414,11 +434,11 @@ int main(int argc, char **argv) {
 	    //message was already printed while parsing
 	    exit(1);
 	}
-    int res=InputSigVec.readVector();
-	while(res!=0){ //will read until reaches a good line (not empty)
-	    if (res==-1) exit(0); //reached EOF //CHECK
-	    res = InputSigVec.readVector();
-	}
+//    int res=InputSigVec.readVector();
+//	while(res!=0){ //will read until reaches a good line (not empty)
+//	    if (res==-1) exit(0); //reached EOF //CHECK
+//	    res = InputSigVec.readVector();
+//	}
 	vector<hcmPort*> ports = top_cell_flat->getPorts();
 	set<hcmNode*> InputNodes;
     set< string > signals;
