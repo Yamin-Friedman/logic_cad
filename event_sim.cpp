@@ -498,20 +498,6 @@ int main(int argc, char **argv) {
 	    for (it; it != signals.end(); it++){
 		    InputNodes.insert(top_cell_flat->getNodes()[(*it)]);
 	    }
-//        vector<hcmPort*>::const_iterator itr = ports.begin();
-//        for (itr;itr!=ports.end();itr++){
-//            if (signals.find((*itr)->getName())!=signals.end() && (*itr)->getDirection()==IN){  //found the signal. checking direction for safety
-//                InputPorts.insert(*itr);
-//                hcmNode *currNode = (*itr)->owner();
-//                if (InputSigVec.getSigValue((*itr)->getName(),val)!=0){
-//                    //could not read signal - handle error (should not happen since signal name is from signals set
-//                   //if decide not to handle - delete 'if'
-//                }
-//                else{
-//                    currNode->setProp("value",val); //setting the value of the node.
-//	                currNode->setProp("prev value",val);
-//                    event_queue.push(currNode); //add to event queue
-//                }
 
     }
 
@@ -522,6 +508,7 @@ int main(int argc, char **argv) {
 		hcmInstance *gate = (*gate_it).second;
 		gate_operator gate_type = get_gate_type(gate->masterCell()->getName());
 		gate->setProp("gate_type",gate_type);
+        gate_queue.push(gate);
 	}
 
 	map<string, hcmNode* >::iterator node_it = top_cell_flat->getNodes().begin();
@@ -534,6 +521,21 @@ int main(int argc, char **argv) {
 		hcmNodeCtx* ctx = outputCtx.at(node->getName());
 		vcd.changeValue(ctx,false);
 	}
+
+
+	//push all gates until circuit is balanced:
+    while (!event_queue.empty() || !gate_queue.empty()){
+        while (!event_queue.empty()) {
+            hcmNode *node = event_queue.front();
+            event_queue.pop();
+            process_event(node, gate_queue);//This gets the fanout on node and pushes the gates into the gate queue
+        }
+        while (!gate_queue.empty()){
+            hcmInstance *gate = gate_queue.front();
+            gate_queue.pop();
+            process_gate(gate,event_queue, gate_queue);//This gets the node that is pushed by the gate and adds an event if the value is changed
+        }
+    }
 
 	int t = 1;
 	//Simulate vector
