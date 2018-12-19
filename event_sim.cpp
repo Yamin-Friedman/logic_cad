@@ -33,21 +33,21 @@ void process_event(hcmNode* node, queue<hcmInstance*> &gate_queue){
 
 // inv_func: Inverts the input
 bool inv_func(vector<bool>& input_vec){
-	int res = input_vec[0];
+	bool res = input_vec[0];
 
 	return !res;
 }
 
 // buffer_func: returns the input
 bool buffer_func(vector<bool>& input_vec){
-	int res = input_vec[0];
+	bool res = input_vec[0];
 
 	return res;
 }
 
 // or_func: Computes OR between all the inputs received in the input_vec
 bool or_func(vector<bool>& input_vec){
-	int res = input_vec[0];
+	bool res = input_vec[0];
 
 	for(int i = 1;i < input_vec.size();i++){
 		res |= input_vec[i];
@@ -58,7 +58,7 @@ bool or_func(vector<bool>& input_vec){
 
 // nor_func: Computes NOR between all the inputs received in the input_vec
 bool nor_func(vector<bool>& input_vec){
-	int res = input_vec[0];
+	bool res = input_vec[0];
 
 	for(int i = 1;i < input_vec.size();i++){
 		res |= input_vec[i];
@@ -69,7 +69,7 @@ bool nor_func(vector<bool>& input_vec){
 
 // and_func: Computes AND between all the inputs received in the input_vec
 bool and_func(vector<bool>& input_vec){
-	int res = input_vec[0];
+	bool res = input_vec[0];
 
 	for(int i = 1;i < input_vec.size();i++){
 		res &= input_vec[i];
@@ -80,7 +80,7 @@ bool and_func(vector<bool>& input_vec){
 
 // nand_func: Computes NAND between all the inputs received in the input_vec
 bool nand_func(vector<bool>& input_vec){
-	int res = input_vec[0];
+	bool res = input_vec[0];
 
 	for(int i = 1;i < input_vec.size();i++){
 		res &= input_vec[i];
@@ -91,7 +91,7 @@ bool nand_func(vector<bool>& input_vec){
 
 // xor_func: Computes XOR between all the inputs received in the input_vec
 bool xor_func(vector<bool>& input_vec){
-	int res = input_vec[0];
+	bool res = input_vec[0];
 
 	for(int i = 1;i < input_vec.size();i++){
 		res ^= input_vec[i];
@@ -240,6 +240,7 @@ void handle_FF_NOR_loop(hcmInstance *first_NOR, hcmInstance *second_NOR, queue<h
 
 // This function checks to see if we have a NOR loop such as appears only in the FF model and returns the second NOR if true.
 hcmInstance *is_FF_NOR(hcmInstance *gate) {
+	return NULL;
 	hcmNode *output_node;
 	hcmInstance *second_NOR = NULL;
 	gate_operator gate_func;
@@ -303,7 +304,9 @@ void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue, queue<hcmInsta
 	bool output_value, old_output_value;
 	gate_operator gate_func;
 	gate->getProp("gate_type",gate_func);
-	input_vals.resize(3);
+
+	if (gate_func == FF_func)
+		input_vals.resize(3);
 
 	map< string , hcmInstPort *>::iterator inst_port_it = gate->getInstPorts().begin();
 
@@ -364,16 +367,17 @@ int read_next_input(hcmSigVec &InputSigVec,set<hcmNode*> InputNodes, queue<hcmNo
 	bool prev_val;
     set<hcmNode *>::const_iterator itr = InputNodes.begin();
     for (itr; itr != InputNodes.end(); itr++) {
-        hcmNode *currNode = (*itr);
-        if (InputSigVec.getSigValue((*itr)->getName(),val)!=0){
-            //could not read signal - handle error (should not happen since signal name is from signals set
-            return -1; //may need to change
-        }
-	    currNode->getProp("value",prev_val);
-        currNode->setProp("value",val); //setting the value of the node.
-        event_queue.push(currNode); //add to event queue
+	    hcmNode *currNode = (*itr);
+	    if (InputSigVec.getSigValue((*itr)->getName(), val) != 0) {
+		    //could not read signal - handle error (should not happen since signal name is from signals set
+		    return -1; //may need to change
+	    }
+	    currNode->getProp("value", prev_val);
+	    if (val != prev_val) {
+		    currNode->setProp("value", val); //setting the value of the node.
+		    event_queue.push(currNode); //add to event queue
+	    }
     }
-    return 0;
 }
 
 //this function updates ALL the output nodes of the design in the vcd to their current value. May need to add a check if the value has changed
@@ -387,7 +391,7 @@ void checkOutputs(set<hcmNode*> &outputNodes, vcdFormatter &vcd, map<string, hcm
         hcmNodeCtx* ctx = outputCtx.at((*itr)->getName());
 	    if (currVal != prevVal) {
 		    vcd.changeValue(ctx, currVal);
-		    (*itr)->setProp("prev val",currVal);
+		    (*itr)->setProp("prev value",currVal);
 	    }
     }
 }
