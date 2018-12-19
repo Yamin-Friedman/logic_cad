@@ -156,36 +156,85 @@ void handle_FF_NOR_loop(hcmInstance *first_NOR, hcmInstance *second_NOR, queue<h
 		}
 	}
 
+	// Find the outputs of the ANDs that push S and R
+	hcmInstance *S_AND;
+	hcmInstance *R_AND;
+	inst_port_it = inner_NOR->getInstPorts().begin();
+	for (inst_port_it; inst_port_it != inner_NOR->getInstPorts().end(); inst_port_it++){
+		hcmNode *node = (*inst_port_it).second->getNode();
+		map< string , hcmInstPort *>::iterator it = node->getInstPorts().begin();
+		for (it; it != node->getInstPorts().end(); it++){
+			hcmPort  *port = (*it).second->getPort();
+			if (port->getDirection() == OUT) {
+				hcmInstance *gate = (*it).second->getInst();
+				gate_operator gate_type;
+				gate->getProp("gate_type",gate_type);
+				if (gate_type == and_func)
+					S_AND = gate;
+			}
+		}
+	}
+
+	inst_port_it = output_NOR->getInstPorts().begin();
+	for (inst_port_it; inst_port_it != output_NOR->getInstPorts().end(); inst_port_it++){
+		hcmNode *node = (*inst_port_it).second->getNode();
+		map< string , hcmInstPort *>::iterator it = node->getInstPorts().begin();
+		for (it; it != node->getInstPorts().end(); it++){
+			hcmPort  *port = (*it).second->getPort();
+			if (port->getDirection() == OUT) {
+				hcmInstance *gate = (*it).second->getInst();
+				gate_operator gate_type;
+				gate->getProp("gate_type",gate_type);
+				if (gate_type == and_func)
+					R_AND = gate;
+			}
+		}
+	}
+
+	bool R_val, S_val;
+	R_AND->getProp("value",R_val);
+	S_AND->getProp("value",S_val);
+
 	// Handle the loop and push output gates to the gate queue
 	second_NOR->setProp("handled",true);
-	// get inputs
-	vector<bool> first_input_vals, second_input_vals;
 
-	inst_port_it = first_NOR->getInstPorts().begin();
-	for(;inst_port_it != first_NOR->getInstPorts().end();inst_port_it++){
-		hcmInstPort *inst_port = (*inst_port_it).second;
-		hcmNode *node = inst_port->getNode();
-		if(inst_port->getPort()->getDirection() == IN){
-			bool val;
-			node->getProp("value",val);
-			first_input_vals.emplace_back(val);
-		}
+	bool R_out, S_out;
+	bool output, inner;
+	inner_NOR->getProp("value",S_out);
+	output_NOR->getProp("value",R_out);
+
+	if (R_val == false && S_val == false) {
+		output = R_out;
+		inner = !R_out;
+	} else if (S_val == true && R_val == false) {
+		output = true;
+		inner = false;
+	} else if (S_val == false && R_val == true) {
+		output = false;
+		inner = true;
+	} else {
+		output = R_out;
+		inner = S_out;
 	}
 
-	inst_port_it = second_NOR->getInstPorts().begin();
-	for(;inst_port_it != second_NOR->getInstPorts().end();inst_port_it++){
-		hcmInstPort *inst_port = (*inst_port_it).second;
-		hcmNode *node = inst_port->getNode();
-		if(inst_port->getPort()->getDirection() == IN){
-			bool val;
-			node->getProp("value",val);
-			second_input_vals.emplace_back(val);
+	inner_NOR->setProp("value",inner);
+	output_NOR->setProp("value",output);
+
+	inst_port_it = output_NOR->getInstPorts().begin();
+	for (inst_port_it; inst_port_it != output_NOR->getInstPorts().end(); inst_port_it++){
+		hcmNode *node = (*inst_port_it).second->getNode();
+		map< string , hcmInstPort *>::iterator it = node->getInstPorts().begin();
+		for (it; it != node->getInstPorts().end(); it++){
+			hcmPort  *port = (*it).second->getPort();
+			if (port->getDirection() == IN) {
+				hcmInstance *gate = (*it).second->getInst();
+				if (gate != inner_NOR) {
+					gate->setProp("value", output);
+					gate_queue.push(gate);
+				}
+			}
 		}
 	}
-
-	int out_1 = nor_func(first_input_vals);
-	int out_2 = nor_func(second_input_vals);
-
 
 }
 
