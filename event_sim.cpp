@@ -100,6 +100,21 @@ bool xor_func(vector<bool>& input_vec){
 	return res;
 }
 
+// xnor_func: Computes XNOR between all the inputs received in the input_vec
+bool xnor_func(vector<bool>& input_vec){
+    bool res = input_vec[0];
+
+    for(int i = 1;i < input_vec.size();i++){
+        if(res==input_vec[i]){
+            res =true;
+        }
+        else res=false;
+    }
+
+    return !res;
+}
+
+
 // FF_func:
 bool FF_func(vector<bool>& input_vec){
 	if (input_vec[1] == true){
@@ -122,6 +137,9 @@ gate_operator get_gate_type(string gate_name){
 	if(gate_name.find("and") != string::npos){
 		return and_func;
 	}
+    if(gate_name.find("xnor") != string::npos){
+        return xnor_func;
+    }
 	if(gate_name.find("nor") != string::npos){
 		return nor_func;
 	}
