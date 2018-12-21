@@ -349,11 +349,17 @@ void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue, queue<hcmInsta
 		}
 	}
 	output_value = gate_func(input_vals);
+	if (gate_func == FF_func)
+		gate->setProp("value",output_value);
+
 	output_node->getProp("value", old_output_value);
 	if (output_value != old_output_value) {
-		output_node->setProp("value", output_value);
-		event_queue.push(output_node);
+		if (gate_func != FF_func) {
+			output_node->setProp("value", output_value);
+			event_queue.push(output_node);
+		}
 	}
+
 }
 
 int read_next_input(hcmSigVec &InputSigVec,set<hcmNode*> InputNodes, queue<hcmNode*> &event_queue) { //this function reads the next line, updates event_queue
@@ -372,7 +378,7 @@ int read_next_input(hcmSigVec &InputSigVec,set<hcmNode*> InputNodes, queue<hcmNo
 		    //could not read signal - handle error (should not happen since signal name is from signals set
 		    return -1; //may need to change
 	    }
-	    currNode->getProp("value", prev_val);
+	    currNode->getProp("prev value", prev_val);
 	    if (val != prev_val) {
 		    currNode->setProp("value", val); //setting the value of the node.
 		    event_queue.push(currNode); //add to event queue
@@ -394,6 +400,46 @@ void checkOutputs(set<hcmNode*> &outputNodes, vcdFormatter &vcd, map<string, hcm
 		    (*itr)->setProp("prev value",currVal);
 	    }
     }
+}
+
+void push_ff_values(queue<hcmNode*> &event_queue, hcmCell *top_cell_flat){
+	map<string, hcmInstance* >::iterator gate_it = top_cell_flat->getInstances().begin();
+	vector<bool> input_vals;
+	input_vals.resize(3);
+	for(gate_it;gate_it != top_cell_flat->getInstances().end(); gate_it++){
+		hcmInstance *gate = (*gate_it).second;
+		gate_operator gate_type;
+		bool output_val;
+		gate->getProp("gate_type",gate_type);
+		if (gate_type == FF_func) {
+			bool val;
+			gate->getProp("value",val);
+			hcmNode *node, *output_node;
+
+			map< string , hcmInstPort *>::iterator inst_port_it = gate->getInstPorts().begin();
+			for(;inst_port_it != gate->getInstPorts().end();inst_port_it++) {
+				hcmInstPort *inst_port = (*inst_port_it).second;
+				hcmNode *node = inst_port->getNode();
+				node->getProp("value", val);
+				if (inst_port->getPort()->getDirection() == IN) {
+					hcmPort *port = inst_port->getPort();
+					hcmNode *port_node = port->owner();
+					if (port_node->getName() == "D") {
+						input_vals[0] = val;
+					} else if (port_node->getName() == "CLK") {
+						input_vals[1] = val;
+					}
+				} else {
+					output_node = node;
+					node->getProp("value", val);
+					input_vals[2] = val;
+				}
+			}
+			output_val = gate_type(input_vals);
+			output_node->setProp("value",output_val);
+			event_queue.push(output_node);
+		}
+	}
 }
 
 
@@ -495,12 +541,15 @@ int main(int argc, char **argv) {
 	vector<hcmPort*> ports = top_cell_flat->getPorts();
 	set<hcmNode*> InputNodes;
     set< string > signals;
+	hcmNode *clk_node;
     bool val;
     int numOfSignals = InputSigVec.getSignals(signals);
     if (numOfSignals!=0){
 	    set<string>::iterator it = signals.begin();
 	    for (it; it != signals.end(); it++){
 		    InputNodes.insert(top_cell_flat->getNodes()[(*it)]);
+		    if((*it) == "CLK")
+			    clk_node = top_cell_flat->getNodes()["CLK"];
 	    }
 
     }
@@ -512,6 +561,10 @@ int main(int argc, char **argv) {
 		hcmInstance *gate = (*gate_it).second;
 		gate_operator gate_type = get_gate_type(gate->masterCell()->getName());
 		gate->setProp("gate_type",gate_type);
+		if (gate_type == FF_func) {
+			gate->setProp("clocked", false);
+			gate->setProp("value",false);
+		}
         gate_queue.push(gate);
 	}
 
@@ -526,7 +579,7 @@ int main(int argc, char **argv) {
 		vcd.changeValue(ctx,false);
 	}
 
-
+	push_ff_values(event_queue,top_cell_flat);
 	//push all gates until circuit is balanced:
     while (!event_queue.empty() || !gate_queue.empty()){
         while (!event_queue.empty()) {
@@ -545,6 +598,10 @@ int main(int argc, char **argv) {
 	//Simulate vector
 	while (read_next_input(InputSigVec,InputNodes,event_queue)!=-1){
 	    //simulate:
+//		bool clk_val;
+//		clk_node->getProp("value", clk_val);
+//		if (clk_val)
+		push_ff_values(event_queue,top_cell_flat);
         while (!event_queue.empty() || !gate_queue.empty()){
             while (!event_queue.empty()) {
                 hcmNode *node = event_queue.front();
@@ -553,6 +610,8 @@ int main(int argc, char **argv) {
             }
             while (!gate_queue.empty()){
                 hcmInstance *gate = gate_queue.front();
+	            gate_operator func;
+	            gate->getProp("gate_type",func);
                 gate_queue.pop();
                 process_gate(gate,event_queue, gate_queue);//This gets the node that is pushed by the gate and adds an event if the value is changed
             }
