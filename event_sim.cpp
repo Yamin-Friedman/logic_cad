@@ -432,7 +432,7 @@ void push_ff_values(queue<hcmNode*> &event_queue, hcmCell *top_cell_flat){
 		if (gate_type == FF_func) {
 			bool val;
 			gate->getProp("value",val);
-			hcmNode *node, *output_node;
+			hcmNode *output_node;
 
 			map< string , hcmInstPort *>::iterator inst_port_it = gate->getInstPorts().begin();
 			for(;inst_port_it != gate->getInstPorts().end();inst_port_it++) {
@@ -593,7 +593,13 @@ int main(int argc, char **argv) {
 			continue;
 		node->setProp("value", false);
 		node->setProp("prev value", false);
-		hcmNodeCtx* ctx = outputCtx.at(node->getName());
+		hcmNodeCtx *ctx;
+		try {
+			ctx = outputCtx.at(node->getName());
+		}
+		catch(...){
+			continue;
+		}
 		vcd.changeValue(ctx,false);
 	}
 
