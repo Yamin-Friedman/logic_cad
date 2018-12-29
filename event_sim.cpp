@@ -344,7 +344,7 @@ void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue, queue<hcmInsta
 				}
 				continue;
 			}
-			input_vals.emplace_back(val);
+			input_vals.push_back(val);
 		} else{
 			output_node = node;
 			if (gate_func == FF_func) {
@@ -574,10 +574,14 @@ int main(int argc, char **argv) {
 	for(;node_it != top_cell_flat->getNodes().end(); node_it++){
 		hcmNode *node = (*node_it).second;
 		if (globalNodes.find(node->getName()) != globalNodes.end()) {
-			if (node->getName() == "VDD")
+			if (node->getName() == "VDD") {
 				node->setProp("value", true);
-			if (node->getName() == "VSS")
-				node->setProp("value",false);
+				node->setProp("prev value", true);
+			}
+			if (node->getName() == "VSS") {
+				node->setProp("value", false);
+				node->setProp("prev value", false);
+			}
 			continue;
 		}
 		node->setProp("value", false);
