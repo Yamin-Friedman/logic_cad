@@ -468,36 +468,25 @@ int main(int argc, char **argv) {
 	string top_cell_name;
 
 	// Parse input
-//	if (argc < 4) {
-//		anyErr++;
-//	} else {
-//		top_cell_name = argv[1];
-//
-//		for (int argIdx = 4;argIdx < argc; argIdx++) {
-//			vlgFiles.push_back(argv[argIdx]);
-//		}
-//
-//		if (vlgFiles.size() < 1) {
-//			cerr << "-E- At least top-level and single verilog file required for spec model" << endl;
-//			anyErr++;
-//		}
-//	}
-//
-//	if (anyErr) {
-//		cerr << "Usage: " << argv[0] << "  [-v] top-cell file1.v [file2.v] ... \n";
-//		exit(1);
-//	}
+	if (argc < 4) {
+		anyErr++;
+	} else {
+		top_cell_name = argv[1];
 
-	cin >> top_cell_name;
-	string sig1;
-	cin >> sig1;
-	string sig2;
-	cin >> sig2;
-	string file;
-	cin >> file;
-	vlgFiles.push_back(file);
-	cin >> file;
-	vlgFiles.push_back(file);
+		for (int argIdx = 4;argIdx < argc; argIdx++) {
+			vlgFiles.push_back(argv[argIdx]);
+		}
+
+		if (vlgFiles.size() < 1) {
+			cerr << "-E- At least top-level and single verilog file required for spec model" << endl;
+			anyErr++;
+		}
+	}
+
+	if (anyErr) {
+		cerr << "Usage: " << argv[0] << "  [-v] top-cell file1.v [file2.v] ... \n";
+		exit(1);
+	}
 
 	// Build HCM design
 	set< string> globalNodes;
@@ -545,17 +534,12 @@ int main(int argc, char **argv) {
 
 
 	//parse signals input:
-//	hcmSigVec InputSigVec(argv[2],argv[3],verbose); // temp
-	hcmSigVec InputSigVec(sig1,sig2,verbose);
+	hcmSigVec InputSigVec(argv[2],argv[3],verbose);
 	if (!InputSigVec.good()){
 	    //message was already printed while parsing
 	    exit(1);
 	}
-//    int res=InputSigVec.readVector();
-//	while(res!=0){ //will read until reaches a good line (not empty)
-//	    if (res==-1) exit(0); //reached EOF //CHECK
-//	    res = InputSigVec.readVector();
-//	}
+
 	vector<hcmPort*> ports = top_cell_flat->getPorts();
 	set<hcmNode*> InputNodes;
     set< string > signals;
@@ -589,8 +573,13 @@ int main(int argc, char **argv) {
 	map<string, hcmNode* >::iterator node_it = top_cell_flat->getNodes().begin();
 	for(;node_it != top_cell_flat->getNodes().end(); node_it++){
 		hcmNode *node = (*node_it).second;
-		if (globalNodes.find(node->getName()) != globalNodes.end())
+		if (globalNodes.find(node->getName()) != globalNodes.end()) {
+			if (node->getName() == "VDD")
+				node->setProp("value", true);
+			if (node->getName() == "VSS")
+				node->setProp("value",false);
 			continue;
+		}
 		node->setProp("value", false);
 		node->setProp("prev value", false);
 		hcmNodeCtx *ctx;
@@ -622,9 +611,7 @@ int main(int argc, char **argv) {
 	//Simulate vector
 	while (read_next_input(InputSigVec,InputNodes,event_queue)!=-1){
 	    //simulate:
-//		bool clk_val;
-//		clk_node->getProp("value", clk_val);
-//		if (clk_val)
+
 		push_ff_values(event_queue,top_cell_flat);
         while (!event_queue.empty() || !gate_queue.empty()){
             while (!event_queue.empty()) {
