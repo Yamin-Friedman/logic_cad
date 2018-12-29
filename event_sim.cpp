@@ -14,22 +14,9 @@ using namespace std;
 
 bool verbose = false;
 
+// gate_operator is a function type for logic gate functionality
 typedef bool (*gate_operator)(vector<bool>&);
 
-//This gets the fanout on node and pushes the gates into the gate
-void process_event(hcmNode* node, queue<hcmInstance*> &gate_queue){
-	map<string, hcmInstPort* > InstPorts = node->getInstPorts();
-	if(InstPorts.empty())
-		return;
-	map<string,hcmInstPort*>::const_iterator iter;
-	for (iter=InstPorts.begin();iter!=InstPorts.end();iter++){ //go over node's instPorts
-		hcmPort *port= (*iter).second->getPort();
-		if(port->getDirection()==IN){ //if port pushes a gate
-		    hcmInstance* curr_gate = (*iter).second->getInst();
-		    gate_queue.push(curr_gate);
-		}
-	}
-}
 
 // inv_func: Inverts the input
 bool inv_func(vector<bool>& input_vec){
@@ -115,7 +102,10 @@ bool xnor_func(vector<bool>& input_vec){
 }
 
 
-// FF_func:
+// FF_func: Computes the FF output based on the input. The inputs must be given in the right order:
+// input_vec[0] = D
+// input_vec[1] = CLK
+// input_vec[2] = Q
 bool FF_func(vector<bool>& input_vec){
 	if (input_vec[1] == true){
 		return input_vec[0];
@@ -124,6 +114,8 @@ bool FF_func(vector<bool>& input_vec){
 	}
 }
 
+
+// get_gate_type: Returns the correct gate function based on the gate name
 gate_operator get_gate_type(string gate_name){
 	if(gate_name.find("buffer") != string::npos){
 		return buffer_func;
@@ -154,6 +146,10 @@ gate_operator get_gate_type(string gate_name){
 	}
 }
 
+// handle_FF_NOR_loop: This function is used to handle the loop that exists in the FF built from logic gates.
+// Our simulator normally cannot handle loops so this special case must be handled seperately.
+// In the end this function pushes the correct output from the loop and sets the other NOR gate in the loop to handled
+// so that we don't calculate the loop twice.
 void handle_FF_NOR_loop(hcmInstance *first_NOR, hcmInstance *second_NOR, queue<hcmInstance*> &gate_queue){
 
 	// We must find out which is the output NOR
@@ -256,7 +252,7 @@ void handle_FF_NOR_loop(hcmInstance *first_NOR, hcmInstance *second_NOR, queue<h
 
 }
 
-// This function checks to see if we have a NOR loop such as appears only in the FF model and returns the second NOR if true.
+// is_FF_NOR: This function checks to see if we have a NOR loop such as appears only in the FF model and returns the second NOR if true.
 hcmInstance *is_FF_NOR(hcmInstance *gate) {
 	return NULL;
 	hcmNode *output_node;
@@ -316,6 +312,25 @@ hcmInstance *is_FF_NOR(hcmInstance *gate) {
 	return NULL;
 }
 
+
+// process_event: This gets the fanout on node and pushes the gates into the gate queue
+void process_event(hcmNode* node, queue<hcmInstance*> &gate_queue){
+	map<string, hcmInstPort* > InstPorts = node->getInstPorts();
+	if(InstPorts.empty())
+		return;
+	map<string,hcmInstPort*>::const_iterator iter;
+	for (iter=InstPorts.begin();iter!=InstPorts.end();iter++){ //go over node's instPorts
+		hcmPort *port= (*iter).second->getPort();
+		if(port->getDirection()==IN){ //if port pushes a gate
+			hcmInstance* curr_gate = (*iter).second->getInst();
+			gate_queue.push(curr_gate);
+		}
+	}
+}
+
+// process_gate: This calculates the correct output of the gate and pushes the new value to the output node and pushes
+// it into the event queue.
+// It handles the special cases of a single module FF and a FF built with a looped gate design.
 void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue, queue<hcmInstance*> &gate_queue){
 	vector<bool> input_vals;
 	hcmNode *output_node;
@@ -346,6 +361,7 @@ void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue, queue<hcmInsta
 			}
 			input_vals.push_back(val);
 		} else{
+			// Gets the output node to be used later to push into the event queue
 			output_node = node;
 			if (gate_func == FF_func) {
 				node->getProp("value",val);
@@ -380,7 +396,8 @@ void process_gate(hcmInstance *gate,queue<hcmNode*> &event_queue, queue<hcmInsta
 
 }
 
-int read_next_input(hcmSigVec &InputSigVec,set<hcmNode*> InputNodes, queue<hcmNode*> &event_queue) { //this function reads the next line, updates event_queue
+// read_next_input: This function reads the next line, updates event_queue
+int read_next_input(hcmSigVec &InputSigVec,set<hcmNode*> InputNodes, queue<hcmNode*> &event_queue) {
 
     int res = InputSigVec.readVector();
     while (res != 0) { //will read until reaches a good line (not empty)
@@ -404,7 +421,8 @@ int read_next_input(hcmSigVec &InputSigVec,set<hcmNode*> InputNodes, queue<hcmNo
     }
 }
 
-//this function updates ALL the output nodes of the design in the vcd to their current value. May need to add a check if the value has changed
+// checkOutputs: This function updates ALL the output nodes of the design in the vcd to their current value.
+// A new value is printed only if the value has changed.
 void checkOutputs(set<hcmNode*> &outputNodes, vcdFormatter &vcd, map<string, hcmNodeCtx*> &outputCtx){
     set<hcmNode*>::const_iterator itr = outputNodes.begin();
     bool currVal;
@@ -420,6 +438,8 @@ void checkOutputs(set<hcmNode*> &outputNodes, vcdFormatter &vcd, map<string, hcm
     }
 }
 
+// push_ff_values: This function is called once per simulation time frame. It pushes the output for all the FFs so that
+// they are edge triggered and not treated like normal gates. Only used when the FFs are single modules.
 void push_ff_values(queue<hcmNode*> &event_queue, hcmCell *top_cell_flat){
 	map<string, hcmInstance* >::iterator gate_it = top_cell_flat->getInstances().begin();
 	vector<bool> input_vals;
@@ -461,6 +481,7 @@ void push_ff_values(queue<hcmNode*> &event_queue, hcmCell *top_cell_flat){
 }
 
 
+// The main function for the event simulator
 int main(int argc, char **argv) {
 	int anyErr = 0;
 	unsigned int i;
@@ -543,33 +564,31 @@ int main(int argc, char **argv) {
 	vector<hcmPort*> ports = top_cell_flat->getPorts();
 	set<hcmNode*> InputNodes;
     set< string > signals;
-	hcmNode *clk_node;
     bool val;
     int numOfSignals = InputSigVec.getSignals(signals);
     if (numOfSignals!=0){
 	    set<string>::iterator it = signals.begin();
 	    for (it; it != signals.end(); it++){
 		    InputNodes.insert(top_cell_flat->getNodes()[(*it)]);
-		    if((*it) == "CLK")
-			    clk_node = top_cell_flat->getNodes()["CLK"];
 	    }
 
     }
 
 
-
+	// Push all the gates into the gate queue to start the simulation
 	map<string, hcmInstance* >::iterator gate_it = top_cell_flat->getInstances().begin();
 	for(gate_it;gate_it != top_cell_flat->getInstances().end(); gate_it++){
 		hcmInstance *gate = (*gate_it).second;
 		gate_operator gate_type = get_gate_type(gate->masterCell()->getName());
 		gate->setProp("gate_type",gate_type);
+		// The requirement for the simulation is that all FFs start at 0
 		if (gate_type == FF_func) {
-			gate->setProp("clocked", false);
 			gate->setProp("value",false);
 		}
         gate_queue.push(gate);
 	}
 
+	// Start a vcd context for all the nodes that aren't global nodes.
 	map<string, hcmNode* >::iterator node_it = top_cell_flat->getNodes().begin();
 	for(;node_it != top_cell_flat->getNodes().end(); node_it++){
 		hcmNode *node = (*node_it).second;
@@ -612,9 +631,9 @@ int main(int argc, char **argv) {
     }
 
 	int t = 1;
-	//Simulate vector
+	//Simulate the circuit
 	while (read_next_input(InputSigVec,InputNodes,event_queue)!=-1){
-	    //simulate:
+	    //simulate the vector:
 
 		push_ff_values(event_queue,top_cell_flat);
         while (!event_queue.empty() || !gate_queue.empty()){
@@ -638,5 +657,4 @@ int main(int argc, char **argv) {
 
 	}
 
-//	delete design;
 }
