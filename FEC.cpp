@@ -17,9 +17,17 @@ using namespace std;
 bool verbose = false;
 
 
-vector<vector<int>> get_node_clasues(hcmNode* node) {
+vector<vector<int>> get_node_clasues(hcmNode* node, map<string,int> &PI_map) {
 	vector<vector<int>> clauses;
 	vector<hcmInstance*> gates;
+
+	// This is a recursion breaking condition of having reached a PI
+	if (PI_map.find(node->getName()) != PI_map.end()) {
+		clauses.push_back(vector<int>(PI_map[node->getName()]));
+		return clauses;
+	}
+
+
 
 	//Find all gates pushing the node
 
@@ -130,13 +138,19 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	map<string,int> PI_sat_map;
+	map<hcmNode*,hcmNode*>::iterator PI_map_it = PI_map.begin();
+	for (;PI_map_it != PI_map.end(); PI_map_it++) {
+		PI_sat_map.insert(PI_map_it->first->getName());//Needs to insert a name/sat integer value
+	}
+
 	// Loop over all the POs in the spec and imp, build clauses for them and compare with sat solver
 
 	map<hcmNode*,hcmNode*>::iterator PO_map_it = PO_map.begin();
 	for (;PO_map_it != PO_map.end(); PO_map_it++) {
 
-		vector<vector<int>> spec_clause = get_node_clasues(PO_map_it->first);
-		vector<vector<int>> imp_clause = get_node_clasues(PO_map_it->second);
+		vector<vector<int>> spec_clause = get_node_clasues(PO_map_it->first,PI_sat_map);
+		vector<vector<int>> imp_clause = get_node_clasues(PO_map_it->second,map<hcmNode*,PI_sat_map);
 
 	}
 
