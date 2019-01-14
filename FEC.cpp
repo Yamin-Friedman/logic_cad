@@ -17,13 +17,13 @@ using namespace std;
 bool verbose = false;
 
 
-vector<vector<int>> get_node_clasues(hcmNode* node, map<string,int> &PI_map) {
+vector<vector<int>> get_node_clasues(hcmNode* node, map<string,int> &PI_sat_map) {
 	vector<vector<int>> clauses;
 	vector<hcmInstance*> gates;
 
 	// This is a recursion breaking condition of having reached a PI
-	if (PI_map.find(node->getName()) != PI_map.end()) {
-		clauses.push_back(vector<int>(PI_map[node->getName()]));
+	if (PI_sat_map.find(node->getName()) != PI_sat_map.end()) {
+		clauses.push_back(vector<int>(PI_sat_map[node->getName()]));
 		return clauses;
 	}
 
@@ -138,23 +138,41 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	// Need to find all FFs attach them between the two designs and add their inputs and outputs to PI and PO lists
+
+
+	// Here for the sat solver we give a unique integer value to all the PIs and POs
+	int var_int = 1;
+
 	map<string,int> PI_sat_map;
 	map<hcmNode*,hcmNode*>::iterator PI_map_it = PI_map.begin();
 	for (;PI_map_it != PI_map.end(); PI_map_it++) {
-		PI_sat_map.insert(PI_map_it->first->getName());//Needs to insert a name/sat integer value
+		PI_sat_map.insert(pair<string,int>(PI_map_it->first->getName(),var_int));
+		var_int++;
 	}
+
+	map<string,int> PO_sat_map;
+	map<hcmNode*,hcmNode*>::iterator PO_map_it = PO_map.begin();
+	for (;PO_map_it != PO_map.end(); PO_map_it++) {
+		PO_sat_map.insert(pair<string,int>(PO_map_it->first->getName(),var_int));
+		var_int++;
+	}
+
+	// Need to set unique integer to all the nodes in the designs that have not yet been set
 
 	// Loop over all the POs in the spec and imp, build clauses for them and compare with sat solver
 
-	map<hcmNode*,hcmNode*>::iterator PO_map_it = PO_map.begin();
+	PO_map_it = PO_map.begin();
 	for (;PO_map_it != PO_map.end(); PO_map_it++) {
 
 		vector<vector<int>> spec_clause = get_node_clasues(PO_map_it->first,PI_sat_map);
 		vector<vector<int>> imp_clause = get_node_clasues(PO_map_it->second,map<hcmNode*,PI_sat_map);
 
-	}
+		// sat solver
 
-	hcmCell *top_cell_flat = hcmFlatten(top_cell_name + "_flat", top_cell, globalNodes);
+		// If a PO is not equal we should print it here
+
+	}
 
 
 }
