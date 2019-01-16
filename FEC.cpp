@@ -16,10 +16,44 @@ using namespace std;
 
 bool verbose = false;
 
+void find_all_FFs(hcmNode *OutNode,map<string,hcmInstance*> &FFs,){
 
-vector<vector<int>> get_node_clasues(hcmNode* node) {
+    map<string,hcmInstPort*> ports = InNode->getInstPorts();
+    map<string,hcmInstPort*>::iterator itr=ports.begin();
+    hcmInstance *gate;
+    bool InNode=false;
+
+    for(;itr!=ports.end();itr++){
+        if (((*itr).second->getPort()->getDirection()==OUT) {
+            gate = (*itr).second->getInst();
+            string name = gate->getName();
+            if (name.find("FF") && FFs.find(name) == map.end()) {
+                FFs.insert<(*itr).second->getInst()->getName(), (*itr).second->getInst()>;
+            }
+            break;
+        }
+        InNode=true; //this node is the final one - not pushed by anything
+    }
+
+    if(InNode) return; //this node is the final one - not pushed by anything
+
+    //check on the gates pushing the node:
+    map<string, hcmInstPort* > InstPorts_gate = gate->getInstPorts();
+    map<string,hcmInstPort*>::iterator g_iter;
+    for (g_iter=InstPorts.begin();g_iter!=InstPorts.end();g_iter++){
+        hcmPort *port= (*g_iter).second->getPort();
+        if(port->getDirection()==IN){
+            //if port pushes a gate, need to traverse:
+            hcmNode* node = (*g_iter).second->getNode();
+            find_all_FFs(node,FFs);
+        }
+    }
+
+}
+
+vector<vector<int>> get_node_clauses(hcmNode* node) {
 	vector<vector<int>> clauses;
-	vector<hcmInstance*> gates;
+    hcmInstance* gate;
 	hcmResultTypes res;
 
 	// This is a recursion breaking condition of having reached a node that we already know the clauses for. This can be
@@ -29,22 +63,59 @@ vector<vector<int>> get_node_clasues(hcmNode* node) {
 		return clauses;
 	}
 
+	//Find gate pushing the node (only one)
+    map<string, hcmInstPort* > InstPorts = node->getInstPorts();
+    map<string,hcmInstPort*>::iterator iter;
+    for (iter=InstPorts.begin();iter!=InstPorts.end();iter++){ //go over node's instPorts
+        hcmPort *port= (*iter).second->getPort();
+        if(port->getDirection()==OUT){ //if port pushes a gate
+            gate = (*iter).second->getInst();
+            break;
+        }
+    }
 
+	//find the in-nodes of the gate:
+	vector<int> in_vars;
+    map<string, hcmInstPort* > InstPorts_gate = gate->getInstPorts();
+    map<string,hcmInstPort*>::iterator g_iter;
+    for (g_iter=InstPorts.begin();g_iter!=InstPorts.end();g_iter++){ //go over node's instPorts
+        hcmPort *port= (*g_iter).second->getPort();
+        if(port->getDirection()==IN){
+            //if port pushes a gate, need to get its clauses, add to in_vars:
+            hcmNode* node = (*g_iter).second->getNode();
+            int var;
+            node->getProp("sat var",var);
+            in_vars.insert(var);
+            vector<vector<int>> node_clauses=get_node_clauses(&node);
+            if (!node_clauses.empty()){
+                clauses.insert(clauses.end(),node_clauses.begin(),node_clauses.end());
+            }
+        }
+    }
 
-	//Find all gates pushing the node
+    //calculate this gate's clause, with the input vars collected from nodes:
+    vector<vector<int>> curr_clause;
+    int gate_var;
+    gate->getProp("sat var",gate_var);
+	string name = gate->getName();
 
-	//Calculate the clauses for each gate
-	vector<hcmInstance*>::iterator gate_it = gates.begin();
-	for (; gate_it != gates.end(); gate_it++) {
-		vector<vector<int>> gate_clauses;
+    if(name.find("nand")){
+        curr_clause = nand_clause(in_vars, gate_var);
+    }
+    if(name.find("and")){
+        curr_clause = and_clause(in_vars, gate_var);
+    }
+    if(name.find("nor")){
+        curr_clause = nor_clause(in_vars, gate_var);
+    }
+    if(name.find("or")){
+        curr_clause = or_clause(in_vars, gate_var);
+    }
+    //TODO: continue for other gate types? (XOR etc?)
 
-
-		clauses.insert(clauses.end(),gate_clauses.begin(),gate_clauses.end());
-
-		// Add to clauses the clauses for all the nodes pushing the gate recursivly with get_node_clauses
-	}
-
-	// Once we have calculated the clauses for a specific node we should save it so that we don't need to calculate again
+    //finally, get final clause vec:
+    clauses.insert(clauses.end(),curr_clause.begin(),curr_clause.end());
+    // Once we have calculated the clauses for a specific node we should save it so that we don't need to calculate again
 	node->setProp("clauses",clauses);
 	return clauses;
 }
@@ -120,6 +191,8 @@ int main(int argc, char **argv) {
 	map<hcmNode*,hcmNode*> PI_map;
 	map<hcmNode*,hcmNode*> PO_map;
 
+
+
 	// We can also set the sat var for each node here. It doesn't matter what the order of the variables are assigned in
 	// as long as there is a match between primary inputs and outputs
 
@@ -164,6 +237,24 @@ int main(int argc, char **argv) {
 		}
 	}
 
+    // Need to find all FFs attach them between the two designs and add their inputs and outputs to PI and PO lists
+    // Once we find the FFs we will need to change the sat var of one design to match the other. This will leave unused
+    // variables but I don't think this matters
+
+    //create a map with all the nodes in the spec circuit:
+    map<string,hcmInstance*> FFs;
+
+    map<string,hcmNode*>::iterator map_it = spec_top_cell->getNodes().begin();
+    for (;map_it != spec_top_cell->getNodes().end(); map_it++) {
+        hcmNode *spec_node = map_it->second;
+        if (spec_node->getPort()->getDirection() == OUT) {
+            find_all_FFs(spec_node, FFs);
+        }
+    }
+    //TODO: go over all the FF in the map, add them to PO (=FF output),PI maps(=FF input)
+
+
+
 	map_it = imp_top_cell->getNodes().begin();
 	for (;map_it != imp_top_cell->getNodes().end(); map_it++) {
 		int temp_int;
@@ -175,9 +266,9 @@ int main(int argc, char **argv) {
 		}
 	}
 
-	// Need to find all FFs attach them between the two designs and add their inputs and outputs to PI and PO lists
-	// Once we find the FFs we will need to change the sat var of one design to match the other. This will leave unused
-	// variables but I don't think this matters
+
+
+
 
 
 
