@@ -17,13 +17,15 @@ using namespace std;
 bool verbose = false;
 
 
-vector<vector<int>> get_node_clasues(hcmNode* node, map<string,int> &PI_sat_map) {
+vector<vector<int>> get_node_clasues(hcmNode* node) {
 	vector<vector<int>> clauses;
 	vector<hcmInstance*> gates;
+	hcmResultTypes res;
 
-	// This is a recursion breaking condition of having reached a PI
-	if (PI_sat_map.find(node->getName()) != PI_sat_map.end()) {
-		clauses.push_back(vector<int>(PI_sat_map[node->getName()]));
+	// This is a recursion breaking condition of having reached a node that we already know the clauses for. This can be
+	// a PI that had its clause preset
+	res = node->getProp("clauses",clauses);
+	if (res == OK) {
 		return clauses;
 	}
 
@@ -118,14 +120,38 @@ int main(int argc, char **argv) {
 	map<hcmNode*,hcmNode*> PI_map;
 	map<hcmNode*,hcmNode*> PO_map;
 
+	// We can also set the sat var for each node here. It doesn't matter what the order of the variables are assigned in
+	// as long as there is a match between primary inputs and outputs
+
+	int var_int = 1;
+
 	map<string,hcmNode*>::iterator map_it = spec_top_cell->getNodes().begin();
 	for (;map_it != spec_top_cell->getNodes().end(); map_it++) {
-		if ((*map_it).second->getPort()->getDirection() == IN) {
-			PI_map.insert(pair<hcmNode*,hcmNode*>((*map_it).second,imp_top_cell->getNode((*map_it).second->getName())));
-		}
-
-		if ((*map_it).second->getPort()->getDirection() == OUT) {
+		hcmNode *spec_node = map_it->second;
+		if (spec_node->getPort()->getDirection() == IN) {
+			hcmNode *imp_node = imp_top_cell->getNode(spec_node->getName());
+			PI_map.insert(pair<hcmNode*,hcmNode*>(spec_node,imp_node));
+			spec_node->setProp("sat var",var_int);
+			vector<vector<int>> clause;
+			clause.push_back(vector<int>(var_int));
+			spec_node->setProp("clauses",clause);
+			imp_node->setProp("sat var",var_int);
+			imp_node->setProp("clauses",clause);
+			var_int++;
+		} else if ((*map_it).second->getPort()->getDirection() == OUT) {
+			hcmNode *imp_node = imp_top_cell->getNode(spec_node->getName());
 			PO_map.insert(pair<hcmNode*,hcmNode*>((*map_it).second,imp_top_cell->getNode((*map_it).second->getName())));
+			map_it->second->setProp("sat var",var_int);
+			imp_top_cell->getNode(map_it->second->getName())->setProp("sat var",var_int);
+			vector<vector<int>> clause;
+			clause.push_back(vector<int>(var_int));
+			spec_node->setProp("clauses",clause);
+			imp_node->setProp("sat var",var_int);
+			imp_node->setProp("clauses",clause);
+			var_int++;
+		} else {
+			map_it->second->setProp("sat var",var_int);
+			var_int++;
 		}
 
 		if ((*map_it).second->getName() == "VDD") {
@@ -138,35 +164,30 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	map_it = imp_top_cell->getNodes().begin();
+	for (;map_it != imp_top_cell->getNodes().end(); map_it++) {
+		int temp_int;
+		hcmResultTypes res;
+		res = map_it->second->getProp("sat var",temp_int);
+		if (res == NOT_FOUND) {
+			map_it->second->setProp("sat var",var_int);
+			var_int++;
+		}
+	}
+
 	// Need to find all FFs attach them between the two designs and add their inputs and outputs to PI and PO lists
+	// Once we find the FFs we will need to change the sat var of one design to match the other. This will leave unused
+	// variables but I don't think this matters
 
 
-	// Here for the sat solver we give a unique integer value to all the PIs and POs
-	int var_int = 1;
-
-	map<string,int> PI_sat_map;
-	map<hcmNode*,hcmNode*>::iterator PI_map_it = PI_map.begin();
-	for (;PI_map_it != PI_map.end(); PI_map_it++) {
-		PI_sat_map.insert(pair<string,int>(PI_map_it->first->getName(),var_int));
-		var_int++;
-	}
-
-	map<string,int> PO_sat_map;
-	map<hcmNode*,hcmNode*>::iterator PO_map_it = PO_map.begin();
-	for (;PO_map_it != PO_map.end(); PO_map_it++) {
-		PO_sat_map.insert(pair<string,int>(PO_map_it->first->getName(),var_int));
-		var_int++;
-	}
-
-	// Need to set unique integer to all the nodes in the designs that have not yet been set
 
 	// Loop over all the POs in the spec and imp, build clauses for them and compare with sat solver
 
-	PO_map_it = PO_map.begin();
+	map<hcmNode*,hcmNode*>::iterator PO_map_it = PO_map.begin();
 	for (;PO_map_it != PO_map.end(); PO_map_it++) {
 
-		vector<vector<int>> spec_clause = get_node_clasues(PO_map_it->first,PI_sat_map);
-		vector<vector<int>> imp_clause = get_node_clasues(PO_map_it->second,map<hcmNode*,PI_sat_map);
+		vector<vector<int>> spec_clause = get_node_clasues(PO_map_it->first);
+		vector<vector<int>> imp_clause = get_node_clasues(PO_map_it->second);
 
 		// sat solver
 
