@@ -82,11 +82,11 @@ vector<vector<int>> get_node_clauses(hcmNode* node) {
         hcmPort *port= (*g_iter).second->getPort();
         if(port->getDirection()==IN){
             //if port pushes a gate, need to get its clauses, add to in_vars:
-            hcmNode* node = (*g_iter).second->getNode();
+            hcmNode* input_node = (*g_iter).second->getNode();
             int var;
-            node->getProp("sat var",var);
-            in_vars.insert(var);
-            vector<vector<int>> node_clauses=get_node_clauses(&node);
+	        input_node->getProp("sat var",var);
+            in_vars.push_back(var);
+            vector<vector<int>> node_clauses = get_node_clauses(input_node);
             if (!node_clauses.empty()){
                 clauses.insert(clauses.end(),node_clauses.begin(),node_clauses.end());
             }
@@ -111,7 +111,17 @@ vector<vector<int>> get_node_clauses(hcmNode* node) {
     if(name.find("or")){
         curr_clause = or_clause(in_vars, gate_var);
     }
-    //TODO: continue for other gate types? (XOR etc?)
+	if(name.find("not")){
+		curr_clause = not_clause(in_vars[0], gate_var);
+	}
+
+	// This is the case if the output of the gate is a constant. The variable name is no longer relevant because all
+	// we need to know is the constant value.
+    if (curr_clause[0][0] == 0 || curr_clause[0][0] == -1) {
+	    node->setProp("sat var",curr_clause[0][0]);
+	    node->setProp("clauses",curr_clause);
+	    return curr_clause;
+    }
 
     //finally, get final clause vec:
     clauses.insert(clauses.end(),curr_clause.begin(),curr_clause.end());
@@ -206,7 +216,7 @@ int main(int argc, char **argv) {
 			PI_map.insert(pair<hcmNode*,hcmNode*>(spec_node,imp_node));
 			spec_node->setProp("sat var",var_int);
 			vector<vector<int>> clause;
-			clause.push_back(vector<int>(var_int));
+			clause.push_back(vector<int>(1,var_int));
 			spec_node->setProp("clauses",clause);
 			imp_node->setProp("sat var",var_int);
 			imp_node->setProp("clauses",clause);
@@ -217,7 +227,7 @@ int main(int argc, char **argv) {
 			map_it->second->setProp("sat var",var_int);
 			imp_top_cell->getNode(map_it->second->getName())->setProp("sat var",var_int);
 			vector<vector<int>> clause;
-			clause.push_back(vector<int>(var_int));
+			clause.push_back(vector<int>(1,var_int));
 			spec_node->setProp("clauses",clause);
 			imp_node->setProp("sat var",var_int);
 			imp_node->setProp("clauses",clause);
@@ -228,11 +238,17 @@ int main(int argc, char **argv) {
 		}
 
 		if ((*map_it).second->getName() == "VDD") {
+			vector<vector<int>> clause;
+			clause.push_back(vector<int>(1,-1));
 			(*map_it).second->setProp("constant", 1);
+			map_it->second->setProp("clauses",clause);// -1 is a special value that means the node is a constant 1
 			imp_top_cell->getNode((*map_it).second->getName())->setProp("constant", 1);
 		}
 		if ((*map_it).second->getName() == "VSS") {
+			vector<vector<int>> clause;
+			clause.push_back(vector<int>(1,0));
 			(*map_it).second->setProp("constant", 0);
+			map_it->second->setProp("clauses",clause);// 0 is a special value that means the node is a constant 0
 			imp_top_cell->getNode((*map_it).second->getName())->setProp("constant", 0);
 		}
 	}
@@ -244,14 +260,14 @@ int main(int argc, char **argv) {
     //create a map with all the nodes in the spec circuit:
     map<string,hcmInstance*> FFs;
 
-    map<string,hcmNode*>::iterator map_it = spec_top_cell->getNodes().begin();
+    map_it = spec_top_cell->getNodes().begin();
     for (;map_it != spec_top_cell->getNodes().end(); map_it++) {
         hcmNode *spec_node = map_it->second;
         if (spec_node->getPort()->getDirection() == OUT) {
             find_all_FFs(spec_node, FFs);
         }
     }
-    //TODO: go over all the FF in the map, add them to PO (=FF output),PI maps(=FF input)
+    //TODO: go over all the FF in the map, add them to PO (=FF input),PI maps(=FF output)
 
 
 
@@ -276,13 +292,26 @@ int main(int argc, char **argv) {
 
 	map<hcmNode*,hcmNode*>::iterator PO_map_it = PO_map.begin();
 	for (;PO_map_it != PO_map.end(); PO_map_it++) {
+		bool is_equal;
 
-		vector<vector<int>> spec_clause = get_node_clasues(PO_map_it->first);
-		vector<vector<int>> imp_clause = get_node_clasues(PO_map_it->second);
+		vector<vector<int>> spec_clause = get_node_clauses(PO_map_it->first);
+		vector<vector<int>> imp_clause = get_node_clauses(PO_map_it->second);
 
-		// sat solver
+		// This should handle the special case where one of the outputs is a constant.
+		if (spec_clause[0][0] == 0 || spec_clause[0][0] == -1 || imp_clause[0][0] == 0 || imp_clause[0][0]) {
+			if (spec_clause[0][0] == imp_clause[0][0]) {
+				is_equal = true;
+			} else {
+				is_equal = false;
+			}
+		} else { // sat solver
+
+		}
 
 		// If a PO is not equal we should print it here
+		if (!is_equal) {
+			cout << "There is a mismatch between the output of the spec and the output of the implementation for the output node: " << PO_map_it->first->getName() << endl;
+		}
 
 	}
 
