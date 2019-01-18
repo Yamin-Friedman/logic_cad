@@ -207,7 +207,7 @@ int main(int argc, char **argv) {
 
 
 	// We can also set the sat var for each node here. It doesn't matter what the order of the variables are assigned in
-	// as long as there is a match between primary inputs and outputs
+	// as long as there is a match between primary inputs
 
 	int var_int = 1;
 
@@ -232,6 +232,8 @@ int main(int argc, char **argv) {
 			vector<vector<int>> clause;
 			clause.push_back(vector<int>(1,var_int));
 			spec_node->setProp("clauses",clause);
+			var_int++;
+			clause[0] = vector<int>(1,var_int);
 			imp_node->setProp("sat var",var_int);
 			imp_node->setProp("clauses",clause);
 			var_int++;
