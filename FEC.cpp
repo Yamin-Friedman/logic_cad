@@ -16,9 +16,9 @@ using namespace std;
 
 bool verbose = false;
 
-void find_all_FFs(hcmNode *OutNode,map<string,hcmInstance*> &FFs,){
+void find_all_FFs(hcmNode *OutNode,map<string,hcmInstance*> &FFs){
 
-    map<string,hcmInstPort*> ports = InNode->getInstPorts();
+	map<string,hcmInstPort*> ports = OutNode->getInstPorts();
     map<string,hcmInstPort*>::iterator itr=ports.begin();
     hcmInstance *gate;
     bool InNode=false;
@@ -211,6 +211,56 @@ int main(int argc, char **argv) {
 
 	int var_int = 1;
 
+	//create a map with all the nodes in the spec circuit:
+	map<string,hcmInstance*> FFs;
+
+	map<string,hcmNode*>::iterator map_itr = spec_top_cell->getNodes().begin();
+	for (;map_itr != spec_top_cell->getNodes().end(); map_itr++) {
+		hcmNode *spec_node = map_itr->second;
+		if (spec_node->getPort()->getDirection() == OUT) {
+			find_all_FFs(spec_node, FFs);
+		}
+	}
+
+
+	//Add all FFs outputs to PO map, FF inputs to PI map
+	//TODO: check that FF names actually match between spec and imp!!
+	map<string,hcmInstance*>::iterator itr = FFs.begin();
+	for (;itr!=FFs.end();itr++){
+		hcmInstance* inst  = (*itr).second;
+		string inst_name = (*itr).first;
+		map<string, hcmInstPort*> instPorts = inst->getInstPorts();
+		map<string,hcmInstPort*>::iterator port_itr = instPorts.begin();
+		for (;port_itr!=instPorts.end();port_itr++){
+			hcmNode *node = (*port_itr).second->getNode();
+			if((*port_itr).second->getPort()->getDirection()==OUT){
+				hcmNode *imp_node = imp_top_cell->getNode(node->getName());
+				PO_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
+				node->setProp("sat var",var_int);
+				vector<vector<int>> clause;
+				clause.push_back(vector<int>(var_int));
+				node->setProp("clauses",clause);
+				imp_node->setProp("sat var",var_int);
+				imp_node->setProp("clauses",clause);
+				var_int++;
+			}
+			else if((*port_itr).second->getPort()->getDirection()==IN){
+				hcmNode *imp_node = imp_top_cell->getNode(node->getName());
+				PI_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
+				node->setProp("sat var",var_int);
+				vector<vector<int>> clause;
+				clause.push_back(vector<int>(var_int));
+				node->setProp("clauses",clause);
+				imp_node->setProp("sat var",var_int);
+				imp_node->setProp("clauses",clause);
+				var_int++;
+			}
+
+		}
+
+	}
+
+	//map the rest of the PO, PI and give int_vars to all nodes:
 	map<string,hcmNode*>::iterator map_it = spec_top_cell->getNodes().begin();
 	for (;map_it != spec_top_cell->getNodes().end(); map_it++) {
 		hcmNode *spec_node = map_it->second;
@@ -258,23 +308,6 @@ int main(int argc, char **argv) {
 		}
 	}
 
-    // Need to find all FFs attach them between the two designs and add their inputs and outputs to PI and PO lists
-    // Once we find the FFs we will need to change the sat var of one design to match the other. This will leave unused
-    // variables but I don't think this matters
-
-    //create a map with all the nodes in the spec circuit:
-    map<string,hcmInstance*> FFs;
-
-    map_it = spec_top_cell->getNodes().begin();
-    for (;map_it != spec_top_cell->getNodes().end(); map_it++) {
-        hcmNode *spec_node = map_it->second;
-        if (spec_node->getPort()->getDirection() == OUT) {
-            find_all_FFs(spec_node, FFs);
-        }
-    }
-    //TODO: go over all the FF in the map, add them to PO (=FF input),PI maps(=FF output)
-
-
 
 	map_it = imp_top_cell->getNodes().begin();
 	for (;map_it != imp_top_cell->getNodes().end(); map_it++) {
@@ -286,11 +319,6 @@ int main(int argc, char **argv) {
 			var_int++;
 		}
 	}
-
-
-
-
-
 
 
 	// Loop over all the POs in the spec and imp, build clauses for them and compare with sat solver

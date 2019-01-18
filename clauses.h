@@ -17,4 +17,6 @@ std::vector<std::vector<int>> or_clause(std::vector<int> input_var, int output_v
 
 std::vector<std::vector<int>> nor_clause(std::vector<int> input_var, int output_var);
 
+std::vector<std::vector<int>> xnor2_clause(std::vector<int> input_var, int output_var);
+
 #endif //CLAUSES_H

@@ -120,3 +120,12 @@ vector<vector<int>> nor_clause(vector<int> input_var, int output_var) {
 	return clauses;
 }
 
+vector<vector<int>> xnor2_clause(vector<int> input_var, int output_var) {
+
+	vector<int> first_clause{-output_var,input_var[0],-input_var[1]};
+	vector<int> sec_clause{-output_var,-input_var[0],input_var[1]};
+	vector<vector<int>> clauses{first_clause,sec_clause};
+
+	return clauses;
+}
+
