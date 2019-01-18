@@ -114,6 +114,9 @@ vector<vector<int>> get_node_clauses(hcmNode* node) {
 	if(name.find("not")){
 		curr_clause = not_clause(in_vars[0], gate_var);
 	}
+	if(name.find("buffer")){
+		curr_clause = buffer_clause(in_vars[0], gate_var);
+	}
 
 	// This is the case if the output of the gate is a constant. The variable name is no longer relevant because all
 	// we need to know is the constant value.

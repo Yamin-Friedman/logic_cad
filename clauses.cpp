@@ -2,6 +2,23 @@
 
 using namespace std;
 
+vector<vector<int>> buffer_clause(int input_var, int output_var) {
+	vector<vector<int>> clauses;
+
+	if (input_var == 0) {
+		clauses.push_back(vector<int>(1,0));
+	} else if (input_var == -1) {
+		clauses.push_back(vector<int>(1,-1));
+	} else {
+		vector<int> pos_clause{input_var, -output_var};
+		vector<int> neg_clause{-input_var, output_var};
+		clauses.push_back(pos_clause);
+		clauses.push_back(neg_clause);
+	}
+
+	return clauses;
+}
+
 vector<vector<int>> not_clause(int input_var, int output_var) {
 	vector<vector<int>> clauses;
 

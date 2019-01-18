@@ -5,6 +5,8 @@
 
 #include <vector>
 
+std::vector<std::vector<int>> buffer_clause(int input_var, int output_var);
+
 std::vector<std::vector<int>> not_clause(int input_var, int output_var);
 
 std::vector<std::vector<int>> and_clause(std::vector<int> input_var, int output_var);
