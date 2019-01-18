@@ -12,6 +12,18 @@
 #include "hcmvcd.h"
 #include "clauses.h"
 
+#include <signal.h>
+#include <zlib.h>
+#define __STDC_LIMIT_MACROS
+#define __STDC_FORMAT_MACROS
+#include "utils/System.h"
+#include "utils/ParseUtils.h"
+#include "utils/Options.h"
+#include "core/Dimacs.h"
+#include "core/Solver.h"
+
+using namespace Minisat;
+
 using namespace std;
 
 bool verbose = false;
@@ -117,6 +129,12 @@ vector<vector<int>> get_node_clauses(hcmNode* node) {
 	if(name.find("buffer")){
 		curr_clause = buffer_clause(in_vars[0], gate_var);
 	}
+	if(name.find("xnor")){
+		curr_clause = xnor2_clause(in_vars, gate_var);
+	}
+	if(name.find("xor")){
+		curr_clause = xor2_clause(in_vars, gate_var);
+	}
 
 	// This is the case if the output of the gate is a constant. The variable name is no longer relevant because all
 	// we need to know is the constant value.
@@ -209,7 +227,7 @@ int main(int argc, char **argv) {
 	// We can also set the sat var for each node here. It doesn't matter what the order of the variables are assigned in
 	// as long as there is a match between primary inputs
 
-	int var_int = 1;
+	int var_int = 2;
 
 	//create a map with all the nodes in the spec circuit:
 	map<string,hcmInstance*> FFs;
@@ -338,7 +356,33 @@ int main(int argc, char **argv) {
 				is_equal = false;
 			}
 		} else { // sat solver
+			vector<int> PO_vars;
+			int var;
+			PO_map_it->first->getProp("sat var",var);
+			PO_vars.push_back(var);
+			PO_map_it->second->getProp("sat var",var);
+			PO_vars.push_back(var);
+			vector<vector<int>> xnor_clause = xnor2_clause(PO_vars,var_int);
 
+			vector<vector<int>> clauses;
+			clauses.insert(clauses.end(),spec_clause.begin(),spec_clause.end());
+			clauses.insert(clauses.end(),imp_clause.begin(),imp_clause.end());
+			clauses.insert(clauses.end(),xnor_clause.begin(),xnor_clause.end());
+
+			Solver S;
+
+			S.verbosity = false;
+			for (int i = 2; i < var_int; i++) {
+				S.newVar();
+			}
+			for (int i = 0; i < clauses.size(); i++) {
+				S.addClause(clauses[i]);
+			}
+			if (!S.simplify()) {
+				is_equal == false;
+			} else {
+				is_equal == true;
+			}
 		}
 
 		// If a PO is not equal we should print it here
