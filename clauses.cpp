@@ -122,10 +122,29 @@ vector<vector<int>> nor_clause(vector<int> input_var, int output_var) {
 
 vector<vector<int>> xnor2_clause(vector<int> input_var, int output_var) {
 
-	vector<int> first_clause{-output_var,input_var[0],-input_var[1]};
-	vector<int> sec_clause{-output_var,-input_var[0],input_var[1]};
-	vector<vector<int>> clauses{first_clause,sec_clause};
+	if (input_var[0] == -1) {
+		return buffer_clause(input_var[1],output_var);
+	} else if (input_var[0] == 0) {
+		return not_clause(input_var[1],output_var);
+	} else {
+		vector<int> first_clause{-output_var, input_var[0], -input_var[1]};
+		vector<int> sec_clause{-output_var, -input_var[0], input_var[1]};
+		vector<vector<int>> clauses{first_clause, sec_clause};
+		return clauses;
+	}
+}
 
-	return clauses;
+vector<vector<int>> xor2_clause(vector<int> input_var, int output_var) {
+
+	if (input_var[0] == 0) {
+		return buffer_clause(input_var[1],output_var);
+	} else if (input_var[0] == -1) {
+		return not_clause(input_var[1],output_var);
+	} else {
+		vector<int> first_clause{output_var, input_var[0], -input_var[1]};
+		vector<int> sec_clause{output_var, -input_var[0], input_var[1]};
+		vector<vector<int>> clauses{first_clause, sec_clause};
+		return clauses;
+	}
 }
 
