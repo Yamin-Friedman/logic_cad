@@ -63,7 +63,7 @@ vector<vector<Lit>> nand_clause(vector<int> input_var, int output_var) {
 
 	for (int i = 0; i < input_var.size(); i++) {
 		if (input_var[i] == 0) {
-			return vector<vector<Lit>>(1,vector<int>(1,~mkLit(1)));
+			return vector<vector<Lit>>(1,vector<Lit>(1,~mkLit(1)));
 		} else if (input_var[i] == -1) {
 			continue;
 		} else {
