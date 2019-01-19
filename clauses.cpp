@@ -2,16 +2,16 @@
 
 using namespace std;
 
-vector<vector<int>> buffer_clause(int input_var, int output_var) {
-	vector<vector<int>> clauses;
+vector<vector<Lit>> buffer_clause(int input_var, int output_var) {
+	vector<vector<Lit>> clauses;
 
 	if (input_var == 0) {
-		clauses.push_back(vector<int>(1,0));
+		clauses.push_back(vector<Lit>(1,mkLit(0)));
 	} else if (input_var == -1) {
-		clauses.push_back(vector<int>(1,-1));
+		clauses.push_back(vector<Lit>(1,-1));
 	} else {
-		vector<int> pos_clause{input_var, -output_var};
-		vector<int> neg_clause{-input_var, output_var};
+		vector<Lit> pos_clause{mkLit(input_var), ~mkLit(output_var)};
+		vector<Lit> neg_clause{~mkLit(input_var), mkLit(output_var)};
 		clauses.push_back(pos_clause);
 		clauses.push_back(neg_clause);
 	}
@@ -19,16 +19,16 @@ vector<vector<int>> buffer_clause(int input_var, int output_var) {
 	return clauses;
 }
 
-vector<vector<int>> not_clause(int input_var, int output_var) {
-	vector<vector<int>> clauses;
+vector<vector<Lit>> not_clause(int input_var, int output_var) {
+	vector<vector<Lit>> clauses;
 
 	if (input_var == 0) {
-		clauses.push_back(vector<int>(1,-1));
+		clauses.push_back(vector<Lit>(1,~mkLit(1)));
 	} else if (input_var == -1) {
-		clauses.push_back(vector<int>(1,0));
+		clauses.push_back(vector<Lit>(1,mkLit(0)));
 	} else {
-		vector<int> pos_clause{input_var, output_var};
-		vector<int> neg_clause{-input_var, -output_var};
+		vector<Lit> pos_clause{mkLit(input_var), mkLit(output_var)};
+		vector<Lit> neg_clause{~mkLit(input_var), ~mkLit(output_var)};
 		clauses.push_back(pos_clause);
 		clauses.push_back(neg_clause);
 	}
@@ -36,18 +36,18 @@ vector<vector<int>> not_clause(int input_var, int output_var) {
 	return clauses;
 }
 
-vector<vector<int>> and_clause(vector<int> input_var, int output_var) {
-	vector<vector<int>> clauses;
-	vector<int> sum_clause{output_var};
+vector<vector<Lit>> and_clause(vector<int> input_var, int output_var) {
+	vector<vector<Lit>> clauses;
+	vector<Lit> sum_clause{mkLit(output_var)};
 
 	for (int i = 0; i < input_var.size(); i++) {
 		if (input_var[i] == 0) {
-			return vector<vector<int>>(1,vector<int>(1,0));
+			return vector<vector<Lit>>(1,vector<Lit>(1,mkLit(0)));
 		} else if (input_var[i] == -1) {
 			continue;
 		} else {
-			sum_clause.push_back(-input_var[i]);
-			vector<int> clause{-output_var, input_var[i]};
+			sum_clause.push_back(~mkLit(input_var[i]));
+			vector<Lit> clause{~mkLit(output_var), mkLit(input_var[i])};
 			clauses.push_back(clause);
 		}
 	}
@@ -57,18 +57,18 @@ vector<vector<int>> and_clause(vector<int> input_var, int output_var) {
 	return clauses;
 }
 
-vector<vector<int>> nand_clause(vector<int> input_var, int output_var) {
-	vector<vector<int>> clauses;
-	vector<int> sum_clause{-output_var};
+vector<vector<Lit>> nand_clause(vector<int> input_var, int output_var) {
+	vector<vector<Lit>> clauses;
+	vector<Lit> sum_clause{~mkLit(output_var)};
 
 	for (int i = 0; i < input_var.size(); i++) {
 		if (input_var[i] == 0) {
-			return vector<vector<int>>(1,vector<int>(1,-1));
+			return vector<vector<Lit>>(1,vector<int>(1,~mkLit(1)));
 		} else if (input_var[i] == -1) {
 			continue;
 		} else {
-			sum_clause.push_back(-input_var[i]);
-			vector<int> clause{output_var, input_var[i]};
+			sum_clause.push_back(~mkLit(input_var[i]));
+			vector<Lit> clause{mkLit(output_var), mkLit(input_var[i])};
 			clauses.push_back(clause);
 		}
 	}
@@ -78,18 +78,18 @@ vector<vector<int>> nand_clause(vector<int> input_var, int output_var) {
 	return clauses;
 }
 
-vector<vector<int>> or_clause(vector<int> input_var, int output_var) {
-	vector<vector<int>> clauses;
-	vector<int> sum_clause{-output_var};
+vector<vector<Lit>> or_clause(vector<int> input_var, int output_var) {
+	vector<vector<Lit>> clauses;
+	vector<Lit> sum_clause{~mkLit(output_var)};
 
 	for (int i = 0; i < input_var.size(); i++) {
 		if (input_var[i] == 0) {
 			continue;
 		} else if (input_var[i] == -1) {
-			return vector<vector<int>>(1,vector<int>(1,-1));
+			return vector<vector<Lit>>(1,vector<Lit>(1,~mkLit(1)));
 		} else {
-			sum_clause.push_back(input_var[i]);
-			vector<int> clause{output_var, -input_var[i]};
+			sum_clause.push_back(mkLit(input_var[i]));
+			vector<Lit> clause{mkLit(output_var), ~mkLit(input_var[i])};
 			clauses.push_back(clause);
 		}
 	}
@@ -99,18 +99,18 @@ vector<vector<int>> or_clause(vector<int> input_var, int output_var) {
 	return clauses;
 }
 
-vector<vector<int>> nor_clause(vector<int> input_var, int output_var) {
-	vector<vector<int>> clauses;
-	vector<int> sum_clause{output_var};
+vector<vector<Lit>> nor_clause(vector<int> input_var, int output_var) {
+	vector<vector<Lit>> clauses;
+	vector<Lit> sum_clause{mkLit(output_var)};
 
 	for (int i = 0; i < input_var.size(); i++) {
 		if (input_var[i] == 0) {
 			continue;
 		} else if (input_var[i] == -1) {
-			return vector<vector<int>>(1,vector<int>(1,0));
+			return vector<vector<Lit>>(1,vector<Lit>(1,mkLit(0)));
 		} else {
-			sum_clause.push_back(input_var[i]);
-			vector<int> clause{-output_var, -input_var[i]};
+			sum_clause.push_back(mkLit(input_var[i]));
+			vector<Lit> clause{~mkLit(output_var), ~mkLit(input_var[i])};
 			clauses.push_back(clause);
 		}
 	}
@@ -120,30 +120,30 @@ vector<vector<int>> nor_clause(vector<int> input_var, int output_var) {
 	return clauses;
 }
 
-vector<vector<int>> xnor2_clause(vector<int> input_var, int output_var) {
+vector<vector<Lit>> xnor2_clause(vector<int> input_var, int output_var) {
 
 	if (input_var[0] == -1) {
 		return buffer_clause(input_var[1],output_var);
 	} else if (input_var[0] == 0) {
 		return not_clause(input_var[1],output_var);
 	} else {
-		vector<int> first_clause{-output_var, input_var[0], -input_var[1]};
-		vector<int> sec_clause{-output_var, -input_var[0], input_var[1]};
-		vector<vector<int>> clauses{first_clause, sec_clause};
+		vector<Lit> first_clause{~mkLit(output_var), mkLit(input_var[0]), ~mkLit(input_var[1])};
+		vector<Lit> sec_clause{~mkLit(output_var), ~mkLit(input_var[0]), mkLit(input_var[1])};
+		vector<vector<Lit>> clauses{first_clause, sec_clause};
 		return clauses;
 	}
 }
 
-vector<vector<int>> xor2_clause(vector<int> input_var, int output_var) {
+vector<vector<Lit>> xor2_clause(vector<int> input_var, int output_var) {
 
 	if (input_var[0] == 0) {
 		return buffer_clause(input_var[1],output_var);
 	} else if (input_var[0] == -1) {
 		return not_clause(input_var[1],output_var);
 	} else {
-		vector<int> first_clause{output_var, input_var[0], -input_var[1]};
-		vector<int> sec_clause{output_var, -input_var[0], input_var[1]};
-		vector<vector<int>> clauses{first_clause, sec_clause};
+		vector<Lit> first_clause{mkLit(output_var), mkLit(input_var[0]), ~mkLit(input_var[1])};
+		vector<Lit> sec_clause{mkLit(output_var), ~mkLit(input_var[0]), mkLit(input_var[1])};
+		vector<vector<Lit>> clauses{first_clause, sec_clause};
 		return clauses;
 	}
 }
