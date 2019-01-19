@@ -138,7 +138,7 @@ vector<vector<Lit>> get_node_clauses(hcmNode* node) {
 
 	// This is the case if the output of the gate is a constant. The variable name is no longer relevant because all
 	// we need to know is the constant value.
-    if (curr_clause[0][0] == 0 || curr_clause[0][0] == -1) {// Not sure if this will still work with Lit values
+    if (curr_clause[0][0].x == 0 || curr_clause[0][0].x == -1) {// Not sure if this will still work with Lit values
 	    node->setProp("sat var",curr_clause[0][0]);
 	    node->setProp("clauses",curr_clause);
 	    return curr_clause;
@@ -255,8 +255,8 @@ int main(int argc, char **argv) {
 				hcmNode *imp_node = imp_top_cell->getNode(node->getName());
 				PO_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
 				node->setProp("sat var",var_int);
-				vector<vector<int>> clause;
-				clause.push_back(vector<int>(var_int));
+				vector<vector<Lit>> clause;
+				clause.push_back(vector<Lit>(var_int));
 				node->setProp("clauses",clause);
 				imp_node->setProp("sat var",var_int);
 				imp_node->setProp("clauses",clause);
@@ -266,8 +266,8 @@ int main(int argc, char **argv) {
 				hcmNode *imp_node = imp_top_cell->getNode(node->getName());
 				PI_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
 				node->setProp("sat var",var_int);
-				vector<vector<int>> clause;
-				clause.push_back(vector<int>(var_int));
+				vector<vector<Lit>> clause;
+				clause.push_back(vector<Lit>(var_int));
 				node->setProp("clauses",clause);
 				imp_node->setProp("sat var",var_int);
 				imp_node->setProp("clauses",clause);
@@ -349,8 +349,8 @@ int main(int argc, char **argv) {
 		vector<vector<Lit>> imp_clause = get_node_clauses(PO_map_it->second);
 
 		// This should handle the special case where one of the outputs is a constant.
-		if (spec_clause[0][0] == 0 || spec_clause[0][0] == -1 || imp_clause[0][0] == 0 || imp_clause[0][0]) {
-			if (spec_clause[0][0] == imp_clause[0][0]) {
+		if (spec_clause[0][0].x == 0 || spec_clause[0][0].x == -1 || imp_clause[0][0].x == 0 || imp_clause[0][0].x == -1) {
+			if (spec_clause[0][0].x == imp_clause[0][0].x) {
 				is_equal = true;
 			} else {
 				is_equal = false;
