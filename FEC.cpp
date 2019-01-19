@@ -63,8 +63,8 @@ void find_all_FFs(hcmNode *OutNode,map<string,hcmInstance*> &FFs){
 
 }
 
-vector<vector<int>> get_node_clauses(hcmNode* node) {
-	vector<vector<int>> clauses;
+vector<vector<Lit>> get_node_clauses(hcmNode* node) {
+	vector<vector<Lit>> clauses;
     hcmInstance* gate;
 	hcmResultTypes res;
 
@@ -98,7 +98,7 @@ vector<vector<int>> get_node_clauses(hcmNode* node) {
             int var;
 	        input_node->getProp("sat var",var);
             in_vars.push_back(var);
-            vector<vector<int>> node_clauses = get_node_clauses(input_node);
+            vector<vector<Lit>> node_clauses = get_node_clauses(input_node);
             if (!node_clauses.empty()){
                 clauses.insert(clauses.end(),node_clauses.begin(),node_clauses.end());
             }
@@ -106,7 +106,7 @@ vector<vector<int>> get_node_clauses(hcmNode* node) {
     }
 
     //calculate this gate's clause, with the input vars collected from nodes:
-    vector<vector<int>> curr_clause;
+    vector<vector<Lit>> curr_clause;
     int gate_var;
     gate->getProp("sat var",gate_var);
 	string name = gate->getName();
@@ -138,7 +138,7 @@ vector<vector<int>> get_node_clauses(hcmNode* node) {
 
 	// This is the case if the output of the gate is a constant. The variable name is no longer relevant because all
 	// we need to know is the constant value.
-    if (curr_clause[0][0] == 0 || curr_clause[0][0] == -1) {
+    if (curr_clause[0][0] == 0 || curr_clause[0][0] == -1) {// Not sure if this will still work with Lit values
 	    node->setProp("sat var",curr_clause[0][0]);
 	    node->setProp("clauses",curr_clause);
 	    return curr_clause;
@@ -227,7 +227,7 @@ int main(int argc, char **argv) {
 	// We can also set the sat var for each node here. It doesn't matter what the order of the variables are assigned in
 	// as long as there is a match between primary inputs
 
-	int var_int = 2;
+	int var_int = 1;
 
 	//create a map with all the nodes in the spec circuit:
 	map<string,hcmInstance*> FFs;
@@ -345,8 +345,8 @@ int main(int argc, char **argv) {
 	for (;PO_map_it != PO_map.end(); PO_map_it++) {
 		bool is_equal;
 
-		vector<vector<int>> spec_clause = get_node_clauses(PO_map_it->first);
-		vector<vector<int>> imp_clause = get_node_clauses(PO_map_it->second);
+		vector<vector<Lit>> spec_clause = get_node_clauses(PO_map_it->first);
+		vector<vector<Lit>> imp_clause = get_node_clauses(PO_map_it->second);
 
 		// This should handle the special case where one of the outputs is a constant.
 		if (spec_clause[0][0] == 0 || spec_clause[0][0] == -1 || imp_clause[0][0] == 0 || imp_clause[0][0]) {
@@ -362,9 +362,9 @@ int main(int argc, char **argv) {
 			PO_vars.push_back(var);
 			PO_map_it->second->getProp("sat var",var);
 			PO_vars.push_back(var);
-			vector<vector<int>> xnor_clause = xnor2_clause(PO_vars,var_int);
+			vector<vector<Lit>> xnor_clause = xnor2_clause(PO_vars,var_int);
 
-			vector<vector<int>> clauses;
+			vector<vector<Lit>> clauses;
 			clauses.insert(clauses.end(),spec_clause.begin(),spec_clause.end());
 			clauses.insert(clauses.end(),imp_clause.begin(),imp_clause.end());
 			clauses.insert(clauses.end(),xnor_clause.begin(),xnor_clause.end());
@@ -379,6 +379,11 @@ int main(int argc, char **argv) {
 				S.addClause(clauses[i]);
 			}
 			if (!S.simplify()) {
+				is_equal == false;
+			} else {
+				is_equal == true;
+			}
+			if (!S.solve()) {
 				is_equal == false;
 			} else {
 				is_equal == true;
