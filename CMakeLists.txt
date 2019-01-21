@@ -11,6 +11,8 @@ file(GLOB hcm.21_10_18
         "*.cpp"
         )
 file(GLOB SOURCES
+        minisat/core*.h
+        minisat/core*.cc
         hcm.21_10_18/include/*.h
         hcm.21_10_18/include/*.cpp
         hcm.21_10_18/src/*.h
@@ -26,6 +28,8 @@ file(GLOB SOURCES
         )
 
 include_directories(
+        minisat/core
+        minisat
         hcm.21_10_18
         hcm.21_10_18/src
         hcm.21_10_18/include
