@@ -17,20 +17,20 @@
 
 using namespace Minisat;
 
-std::vector<std::vector<Lit>> buffer_clause(int input_var, int output_var);
+std::vector<std::vector<Lit> > buffer_clause(int input_var, int output_var);
 
-std::vector<std::vector<Lit>> not_clause(int input_var, int output_var);
+std::vector<std::vector<Lit> > not_clause(int input_var, int output_var);
 
-std::vector<std::vector<Lit>> and_clause(std::vector<int> input_var, int output_var);
+std::vector<std::vector<Lit> > and_clause(std::vector<int> input_var, int output_var);
 
-std::vector<std::vector<Lit>> nand_clause(std::vector<int> input_var, int output_var);
+std::vector<std::vector<Lit> > nand_clause(std::vector<int> input_var, int output_var);
 
-std::vector<std::vector<Lit>> or_clause(std::vector<int> input_var, int output_var);
+std::vector<std::vector<Lit> > or_clause(std::vector<int> input_var, int output_var);
 
-std::vector<std::vector<Lit>> nor_clause(std::vector<int> input_var, int output_var);
+std::vector<std::vector<Lit> > nor_clause(std::vector<int> input_var, int output_var);
 
-std::vector<std::vector<Lit>> xnor2_clause(std::vector<int> input_var, int output_var);
+std::vector<std::vector<Lit> > xnor2_clause(std::vector<int> input_var, int output_var);
 
-std::vector<std::vector<Lit>> xor2_clause(std::vector<int> input_var, int output_var);
+std::vector<std::vector<Lit> > xor2_clause(std::vector<int> input_var, int output_var);
 
 #endif //CLAUSES_H

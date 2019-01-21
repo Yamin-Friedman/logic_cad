@@ -7,9 +7,6 @@
 #include <map>
 #include <vector>
 #include "hcm.h"
-#include "flat.h"
-#include "hcmsigvec.h"
-#include "hcmvcd.h"
 #include "clauses.h"
 
 #include <signal.h>
@@ -64,8 +61,8 @@ void find_all_FFs(hcmNode *OutNode,map<string,hcmInstance*> &FFs){
 
 }
 
-vector<vector<Lit>> get_node_clauses(hcmNode* node) {
-	vector<vector<Lit>> clauses;
+vector<vector<Lit> > get_node_clauses(hcmNode* node) {
+	vector<vector<Lit> > clauses;
     hcmInstance* gate;
 	hcmResultTypes res;
 
@@ -99,7 +96,7 @@ vector<vector<Lit>> get_node_clauses(hcmNode* node) {
             int var;
 	        input_node->getProp("sat var",var);
             in_vars.push_back(var);
-            vector<vector<Lit>> node_clauses = get_node_clauses(input_node);
+            vector<vector<Lit> > node_clauses = get_node_clauses(input_node);
             if (!node_clauses.empty()){
                 clauses.insert(clauses.end(),node_clauses.begin(),node_clauses.end());
             }
@@ -107,7 +104,7 @@ vector<vector<Lit>> get_node_clauses(hcmNode* node) {
     }
 
     //calculate this gate's clause, with the input vars collected from nodes:
-    vector<vector<Lit>> curr_clause;
+    vector<vector<Lit> > curr_clause;
     int gate_var;
     gate->getProp("sat var",gate_var);
 	string name = gate->getName();
@@ -256,7 +253,7 @@ int main(int argc, char **argv) {
 				hcmNode *imp_node = imp_top_cell->getNode(node->getName());
 				PO_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
 				node->setProp("sat var",var_int);
-				vector<vector<Lit>> clause;
+				vector<vector<Lit> > clause;
 				clause.push_back(vector<Lit>(var_int));
 				node->setProp("clauses",clause);
 				imp_node->setProp("sat var",var_int);
@@ -267,7 +264,7 @@ int main(int argc, char **argv) {
 				hcmNode *imp_node = imp_top_cell->getNode(node->getName());
 				PI_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
 				node->setProp("sat var",var_int);
-				vector<vector<Lit>> clause;
+				vector<vector<Lit> > clause;
 				clause.push_back(vector<Lit>(var_int));
 				node->setProp("clauses",clause);
 				imp_node->setProp("sat var",var_int);
@@ -287,7 +284,7 @@ int main(int argc, char **argv) {
 			hcmNode *imp_node = imp_top_cell->getNode(spec_node->getName());
 			PI_map.insert(pair<hcmNode*,hcmNode*>(spec_node,imp_node));
 			spec_node->setProp("sat var",var_int);
-			vector<vector<int>> clause;
+			vector<vector<int> > clause;
 			clause.push_back(vector<int>(1,var_int));
 			spec_node->setProp("clauses",clause);
 			imp_node->setProp("sat var",var_int);
@@ -298,7 +295,7 @@ int main(int argc, char **argv) {
 			PO_map.insert(pair<hcmNode*,hcmNode*>((*map_it).second,imp_top_cell->getNode((*map_it).second->getName())));
 			map_it->second->setProp("sat var",var_int);
 			imp_top_cell->getNode(map_it->second->getName())->setProp("sat var",var_int);
-			vector<vector<int>> clause;
+			vector<vector<int> > clause;
 			clause.push_back(vector<int>(1,var_int));
 			spec_node->setProp("clauses",clause);
 			var_int++;
@@ -312,14 +309,14 @@ int main(int argc, char **argv) {
 		}
 
 		if ((*map_it).second->getName() == "VDD") {
-			vector<vector<int>> clause;
+			vector<vector<int> > clause;
 			clause.push_back(vector<int>(1,-1));
 			(*map_it).second->setProp("constant", 1);
 			map_it->second->setProp("clauses",clause);// -1 is a special value that means the node is a constant 1
 			imp_top_cell->getNode((*map_it).second->getName())->setProp("constant", 1);
 		}
 		if ((*map_it).second->getName() == "VSS") {
-			vector<vector<int>> clause;
+			vector<vector<int> > clause;
 			clause.push_back(vector<int>(1,0));
 			(*map_it).second->setProp("constant", 0);
 			map_it->second->setProp("clauses",clause);// 0 is a special value that means the node is a constant 0
@@ -346,8 +343,8 @@ int main(int argc, char **argv) {
 	for (;PO_map_it != PO_map.end(); PO_map_it++) {
 		bool is_equal;
 
-		vector<vector<Lit>> spec_clause = get_node_clauses(PO_map_it->first);
-		vector<vector<Lit>> imp_clause = get_node_clauses(PO_map_it->second);
+		vector<vector<Lit> > spec_clause = get_node_clauses(PO_map_it->first);
+		vector<vector<Lit> > imp_clause = get_node_clauses(PO_map_it->second);
 
 		// This should handle the special case where one of the outputs is a constant.
 		if (spec_clause[0][0].x == 0 || spec_clause[0][0].x == -1 || imp_clause[0][0].x == 0 || imp_clause[0][0].x == -1) {
@@ -363,9 +360,9 @@ int main(int argc, char **argv) {
 			PO_vars.push_back(var);
 			PO_map_it->second->getProp("sat var",var);
 			PO_vars.push_back(var);
-			vector<vector<Lit>> xnor_clause = xnor2_clause(PO_vars,var_int);
+			vector<vector<Lit> > xnor_clause = xnor2_clause(PO_vars,var_int);
 
-			vector<vector<Lit>> clauses;
+			vector<vector<Lit> > clauses;
 			clauses.insert(clauses.end(),spec_clause.begin(),spec_clause.end());
 			clauses.insert(clauses.end(),imp_clause.begin(),imp_clause.end());
 			clauses.insert(clauses.end(),xnor_clause.begin(),xnor_clause.end());

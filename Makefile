@@ -1,5 +1,5 @@
 # Update the paths below according to your directory structure
-HCMPATH=$(shell pwd)/../
+HCMPATH=$(shell pwd)
 MINISAT=HCMPATH/minisat/
 
 # required for adding code of minisat to your program
