@@ -1,15 +1,26 @@
+# Update the paths below according to your directory structure
 HCMPATH=$(shell pwd)/../
+MINISAT=HCMPATH/minisat/
 
-CXXFLAGS=-ggdb -O0 -fPIC -I$(HCMPATH)/include -I$(HCMPATH)/flattener -I$(HCMPATH)/sigvec -I$(HCMPATH)/hcm_vcd
-CFLAGS=-ggdb -O0 -fPIC -I$(HCMPATH)/include -I$(HCMPATH)/flattener -I$(HCMPATH)/sigvec -I$(HCMPATH)/hcm_vcd
+# required for adding code of minisat to your program
+MINISAT_OBJS=$(MINISAT)/core/Solver.o $(MINISAT)/utils/Options.o $(MINISAT)/utils/System.o
+
+CXXFLAGS=-ggdb -O0 -fPIC -I$(HCMPATH)/include -I$(MINISAT)
+CFLAGS=-ggdb -O0 -fPIC -I$(HCMPATH)/include -I$(MINISAT)
 CC=g++
-LDFLAGS=-L$(HCMPATH)/src -lhcm -Wl,-rpath=$(HCMPATH)/src  -L$(HCMPATH)/sigvec -lhcmsigvec  -Wl,-rpath=$(HCMPATH)/sigvec -L$(HCMPATH)/hcm_vcd
+LDFLAGS= $(MINISAT_OBJS) -L$(HCMPATH)/src -lhcm -Wl,-rpath=$(HCMPATH)/src 
 
-all: event_sim
+all: FEC # add your executable name here
 
-event_sim: event_sim.o
-	g++ -o $@ $^ $(LDFLAGS) $(HCMPATH)/flattener/flat.o $(HCMPATH)/hcm_vcd/vcd.o
+FEC.o: FEC.cpp clauses.h clauses.cpp 
+	g++ -o $@ $^ $(LDFLAGS)
+	
+clauses.o: clauses.h clauses.cpp
+	g++ -o $@ $^ $(LDFLAGS)
 
+#FEC.o: FEC.cc clauses.h clauses.c
 
-clean:
-	 @ rm *.o event_sim
+# add rules for your executable similar to minisat_api_example
+
+clean: 
+	@ rm *.o FEC

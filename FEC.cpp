@@ -36,11 +36,12 @@ void find_all_FFs(hcmNode *OutNode,map<string,hcmInstance*> &FFs){
     bool InNode=false;
 
     for(;itr!=ports.end();itr++){
-        if (((*itr).second->getPort()->getDirection()==OUT) {
+        if ((*itr).second->getPort()->getDirection()==OUT) {
             gate = (*itr).second->getInst();
             string name = gate->getName();
-            if (name.find("FF") && FFs.find(name) == map.end()) {
-                FFs.insert<(*itr).second->getInst()->getName(), (*itr).second->getInst()>;
+            if (name.find("FF") && FFs.find(name) == FFs.end()) {
+            	string name = (*itr).second->getInst()->getName();
+				FFs.insert(pair<string,hcmInstance*>(name,(*itr).second->getInst()));
             }
             break;
         }
@@ -52,7 +53,7 @@ void find_all_FFs(hcmNode *OutNode,map<string,hcmInstance*> &FFs){
     //check on the gates pushing the node:
     map<string, hcmInstPort* > InstPorts_gate = gate->getInstPorts();
     map<string,hcmInstPort*>::iterator g_iter;
-    for (g_iter=InstPorts.begin();g_iter!=InstPorts.end();g_iter++){
+    for (g_iter=InstPorts_gate.begin();g_iter!=InstPorts_gate.end();g_iter++){
         hcmPort *port= (*g_iter).second->getPort();
         if(port->getDirection()==IN){
             //if port pushes a gate, need to traverse:
@@ -376,7 +377,13 @@ int main(int argc, char **argv) {
 				S.newVar();
 			}
 			for (int i = 0; i < clauses.size(); i++) {
-				S.addClause(clauses[i]);
+				vector<Lit> original = clauses[i];
+				vec<Lit> newVec(original.size());
+				for (int j=0;j<original.size();j++){
+					newVec[i]=original[i];
+				}
+			    S.addClause(newVec);
+				//S.addClause(clauses[i]);
 			}
 			if (!S.simplify()) {
 				is_equal == false;

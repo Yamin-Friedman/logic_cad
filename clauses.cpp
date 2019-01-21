@@ -8,7 +8,7 @@ vector<vector<Lit>> buffer_clause(int input_var, int output_var) {
 	if (input_var == 0) {
 		clauses.push_back(vector<Lit>(1,mkLit(0)));
 	} else if (input_var == -1) {
-		clauses.push_back(vector<Lit>(1,-1));
+		clauses.push_back(vector<Lit>(1,~mkLit(1)));
 	} else {
 		vector<Lit> pos_clause{mkLit(input_var), ~mkLit(output_var)};
 		vector<Lit> neg_clause{~mkLit(input_var), mkLit(output_var)};
