@@ -8,14 +8,14 @@ MINISAT_OBJS=$(MINISAT)/core/Solver.o $(MINISAT)/utils/Options.o $(MINISAT)/util
 CXXFLAGS=-ggdb -O0 -fPIC -I$(HCMPATH)/include -I$(MINISAT) 
 CFLAGS=-ggdb -O0 -fPIC -I$(HCMPATH)/include -I$(MINISAT) 
 CC=g++ 
-LDFLAGS= $(MINISAT_OBJS) -L$(HCMPATH)/src -lhcm -Wl,-rpath=$(HCMPATH)/src -I$(HCMPATH)/include  
+LDFLAGS= $(MINISAT_OBJS) -L$(HCMPATH)/src -lhcm -Wl,-rpath=$(HCMPATH)/src -I$(HCMPATH)/include
 
 FEC: FEC.o clauses.o 
 
-FEC.o: FEC.cpp clauses.o clauses.h 
+FEC.o: FEC.cpp clauses.o 
 	$(CC) -c -o $@ $< $(CXXFLAGS)
 
-clauses.o: clauses.h clauses.cpp
+clauses.o: clauses.cpp
 	$(CC) -c -o $@ $< $(CXXFLAGS)
 
 #FEC.o: FEC.cc clauses.h clauses.c
