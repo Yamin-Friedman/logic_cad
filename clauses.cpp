@@ -2,6 +2,8 @@
 
 using namespace std;
 
+using namespace Minisat;
+
 vector<vector<Lit> > buffer_clause(int input_var, int output_var) {
 	vector<vector<Lit> > clauses;
 
