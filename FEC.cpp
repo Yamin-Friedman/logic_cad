@@ -158,13 +158,14 @@ void parse_input(int argc, char **argv, vector<string> *spec_vlgFiles, vector<st
 		any_err++;
 	} else {
 		for (int i = 1; i < argc; i++) {
-			if (argv[i] == "-v") {
+		    string arg= argv[i];
+			if (arg == "-v") {
 				verbose = true;
-			} else if (argv[i] == "-s") {
+			} else if (arg == "-s") {
 				vlgFiles_ptr = spec_vlgFiles;
 				*spec_top_cell_name = argv[i + 1];
 				i++;
-			} else if (argv[i] == "-i") {
+			} else if (arg == "-i") {
 				vlgFiles_ptr = implementation_vlgFiles;
 				*implementation_top_cell_name = argv[i + 1];
 				i++;
@@ -230,10 +231,11 @@ int main(int argc, char **argv) {
 	//create a map with all the nodes in the spec circuit:
 	map<string,hcmInstance*> FFs;
 
-	map<string,hcmNode*>::iterator map_itr = spec_top_cell->getNodes().begin();
-	for (;map_itr != spec_top_cell->getNodes().end(); map_itr++) {
-		hcmNode *spec_node = map_itr->second;
-		if (spec_node->getPort()->getDirection() == OUT) {
+    map<string,hcmNode*>spec_map = spec_top_cell->getNodes();
+	map<string,hcmNode*>::iterator map_itr = spec_map.begin();
+	for (;map_itr!= spec_map.end(); map_itr++) {
+		hcmNode *spec_node = (*map_itr).second;
+		if ((spec_node->getPort()->getDirection()) == OUT) {
 			find_all_FFs(spec_node, FFs);
 		}
 	}
@@ -280,7 +282,10 @@ int main(int argc, char **argv) {
 	map<string,hcmNode*>::iterator map_it = spec_top_cell->getNodes().begin();
 	for (;map_it != spec_top_cell->getNodes().end(); map_it++) {
 		hcmNode *spec_node = map_it->second;
-		if (spec_node->getPort()->getDirection() == IN) {
+        //first make sure this node was not already assigned by FFs:
+        if((PO_map.find(spec_node)!=PO_map.end())||(PI_map.find(spec_node)!=PI_map.end())) continue;
+
+		else if (spec_node->getPort()->getDirection() == IN) {
 			hcmNode *imp_node = imp_top_cell->getNode(spec_node->getName());
 			PI_map.insert(pair<hcmNode*,hcmNode*>(spec_node,imp_node));
 			spec_node->setProp("sat var",var_int);
@@ -380,7 +385,6 @@ int main(int argc, char **argv) {
 					newVec[i]=original[i];
 				}
 			    S.addClause(newVec);
-				//S.addClause(clauses[i]);
 			}
 			if (!S.simplify()) {
 				is_equal == false;
