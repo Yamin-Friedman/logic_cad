@@ -7,6 +7,7 @@
 #include <map>
 #include <vector>
 #include "hcm.h"
+#include "flat.h"
 #include "clauses.h"
 
 #include <signal.h>
@@ -217,9 +218,17 @@ int main(int argc, char **argv) {
 	hcmCell *spec_top_cell = spec_design->getCell(spec_top_cell_name);
 	hcmCell *imp_top_cell = imp_design->getCell(imp_top_cell_name);
 
+	hcmCell *spec_cell_flat = hcmFlatten(spec_top_cell_name + "_flat",spec_top_cell,globalNodes);
+	hcmCell *imp_cell_flat = hcmFlatten(imp_top_cell_name + "_flat",imp_top_cell,globalNodes);
+
+
 	// The spec PI/O is first and the imp PI/O is second
 	map<hcmNode*,hcmNode*> PI_map;
 	map<hcmNode*,hcmNode*> PO_map;
+
+	//save a map of top cell nodes (not flattened):
+	map<string,hcmNode*> spec_top_nodes = spec_top_cell->getNodes();
+	map<string,hcmNode*> imp_top_nodes=imp_top_cell->getNodes();
 
 
 
@@ -235,10 +244,18 @@ int main(int argc, char **argv) {
 	map<string,hcmNode*>::iterator map_itr = spec_map.begin();
 	for (;map_itr!= spec_map.end(); map_itr++) {
 		hcmNode *spec_node = (*map_itr).second;
-		if ((spec_node->getPort()->getDirection()) == OUT) {
-			find_all_FFs(spec_node, FFs);
+		if (spec_node->getPort()!=NULL){
+			//traverse on each output node and find FFs (TODO:can shorten now that we have flat):
+			if ((spec_node->getPort()->getDirection()) == OUT) {
+				//we want to traverse on flat model:
+				hcmNode* flat_spec_node = spec_cell_flat->getNode(spec_node->getName());
+				find_all_FFs(flat_spec_node, FFs);
+			}
 		}
+
 	}
+
+
 
 
 	//Add all FFs outputs to PO map, FF inputs to PI map
@@ -252,7 +269,7 @@ int main(int argc, char **argv) {
 		for (;port_itr!=instPorts.end();port_itr++){
 			hcmNode *node = (*port_itr).second->getNode();
 			if((*port_itr).second->getPort()->getDirection()==OUT){
-				hcmNode *imp_node = imp_top_cell->getNode(node->getName());
+				hcmNode *imp_node = imp_cell_flat->getNode(node->getName());
 				PO_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
 				node->setProp("sat var",var_int);
 				vector<vector<Lit> > clause;
@@ -263,7 +280,7 @@ int main(int argc, char **argv) {
 				var_int++;
 			}
 			else if((*port_itr).second->getPort()->getDirection()==IN){
-				hcmNode *imp_node = imp_top_cell->getNode(node->getName());
+				hcmNode *imp_node = imp_cell_flat->getNode(node->getName());
 				PI_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
 				node->setProp("sat var",var_int);
 				vector<vector<Lit> > clause;
@@ -279,14 +296,15 @@ int main(int argc, char **argv) {
 	}
 
 	//map the rest of the PO, PI and give int_vars to all nodes:
-	map<string,hcmNode*>::iterator map_it = spec_top_cell->getNodes().begin();
-	for (;map_it != spec_top_cell->getNodes().end(); map_it++) {
+	map<string,hcmNode*>::iterator map_it = spec_cell_flat->getNodes().begin();
+	for (;map_it != spec_cell_flat->getNodes().end(); map_it++) {
 		hcmNode *spec_node = map_it->second;
         //first make sure this node was not already assigned by FFs:
         if((PO_map.find(spec_node)!=PO_map.end())||(PI_map.find(spec_node)!=PI_map.end())) continue;
 
-		else if (spec_node->getPort()->getDirection() == IN) {
-			hcmNode *imp_node = imp_top_cell->getNode(spec_node->getName());
+        //if this is a true top input node:
+		else if (spec_node->getPort()!=NULL &&(spec_node->getPort()->getDirection() == IN) && (spec_top_nodes.find(spec_node->getName())!=spec_top_nodes.end())) {
+			hcmNode *imp_node = imp_cell_flat->getNode(spec_node->getName());
 			PI_map.insert(pair<hcmNode*,hcmNode*>(spec_node,imp_node));
 			spec_node->setProp("sat var",var_int);
 			vector<vector<int> > clause;
@@ -295,11 +313,13 @@ int main(int argc, char **argv) {
 			imp_node->setProp("sat var",var_int);
 			imp_node->setProp("clauses",clause);
 			var_int++;
-		} else if ((*map_it).second->getPort()->getDirection() == OUT) {
-			hcmNode *imp_node = imp_top_cell->getNode(spec_node->getName());
-			PO_map.insert(pair<hcmNode*,hcmNode*>((*map_it).second,imp_top_cell->getNode((*map_it).second->getName())));
-			map_it->second->setProp("sat var",var_int);
-			imp_top_cell->getNode(map_it->second->getName())->setProp("sat var",var_int);
+
+		//if this is a true top output node:
+		} else if (spec_node->getPort()!=NULL &&(spec_node->getPort()->getDirection() == OUT) && (spec_top_nodes.find(spec_node->getName())!=spec_top_nodes.end())) {
+			hcmNode *imp_node = imp_cell_flat->getNode(spec_node->getName());
+			PO_map.insert(pair<hcmNode*,hcmNode*>(spec_node,imp_node));
+			spec_node->setProp("sat var",var_int);
+			imp_node->setProp("sat var",var_int);
 			vector<vector<int> > clause;
 			clause.push_back(vector<int>(1,var_int));
 			spec_node->setProp("clauses",clause);
@@ -309,29 +329,30 @@ int main(int argc, char **argv) {
 			imp_node->setProp("clauses",clause);
 			var_int++;
 		} else {
-			map_it->second->setProp("sat var",var_int);
+			spec_node->setProp("sat var",var_int);
 			var_int++;
 		}
 
-		if ((*map_it).second->getName() == "VDD") {
+		if (spec_node->getName() == "VDD") {
 			vector<vector<int> > clause;
 			clause.push_back(vector<int>(1,-1));
-			(*map_it).second->setProp("constant", 1);
-			map_it->second->setProp("clauses",clause);// -1 is a special value that means the node is a constant 1
-			imp_top_cell->getNode((*map_it).second->getName())->setProp("constant", 1);
+			spec_node->setProp("constant", 1);
+			spec_node->setProp("clauses",clause);// -1 is a special value that means the node is a constant 1
+			imp_cell_flat->getNode(spec_node->getName())->setProp("constant", 1);
 		}
-		if ((*map_it).second->getName() == "VSS") {
+		if (spec_node->getName() == "VSS") {
 			vector<vector<int> > clause;
 			clause.push_back(vector<int>(1,0));
-			(*map_it).second->setProp("constant", 0);
-			map_it->second->setProp("clauses",clause);// 0 is a special value that means the node is a constant 0
-			imp_top_cell->getNode((*map_it).second->getName())->setProp("constant", 0);
+			spec_node->setProp("constant", 0);
+			spec_node->setProp("clauses",clause);// 0 is a special value that means the node is a constant 0
+			imp_cell_flat->getNode(spec_node->getName())->setProp("constant", 0);
 		}
 	}
 
 
-	map_it = imp_top_cell->getNodes().begin();
-	for (;map_it != imp_top_cell->getNodes().end(); map_it++) {
+	//give sat var for all imp nodes not traversed:
+	map_it = imp_cell_flat->getNodes().begin();
+	for (;map_it != imp_cell_flat->getNodes().end(); map_it++) {
 		int temp_int;
 		hcmResultTypes res;
 		res = map_it->second->getProp("sat var",temp_int);
