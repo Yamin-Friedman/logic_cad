@@ -9,7 +9,6 @@
 #include "hcm.h"
 #include "flat.h"
 #include "clauses.h"
-
 #include <signal.h>
 #include <zlib.h>
 #define __STDC_LIMIT_MACROS
@@ -36,8 +35,8 @@ void find_all_FFs(hcmNode *OutNode,map<string,hcmInstance*> &FFs){
     for(;itr!=ports.end();itr++){
         if ((*itr).second->getPort()->getDirection()==OUT) {
             gate = (*itr).second->getInst();
-            string name = gate->getName();
-            if (name.find("FF") && FFs.find(name) == FFs.end()) {
+            string name = gate->masterCell()->getName();
+            if (name.find("buffer")==string::npos && (name.find("ff")!= string::npos) && FFs.find(name) == FFs.end()) {
             	string name = (*itr).second->getInst()->getName();
 				FFs.insert(pair<string,hcmInstance*>(name,(*itr).second->getInst()));
             }
@@ -93,6 +92,7 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
         hcmPort *port= (*g_iter).second->getPort();
         if(port->getDirection()==IN){
             //if port pushes a gate, need to get its clauses, add to in_vars:
+            cout<<"found in port"<<endl;
             hcmNode* input_node = (*g_iter).second->getNode();
             int var;
 	        input_node->getProp("sat var",var);
@@ -108,36 +108,43 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
     vector<vector<Lit> > curr_clause;
     int gate_var;
     gate->getProp("sat var",gate_var);
-	string name = gate->getName();
+	string name = gate->masterCell()->getName();
 
-    if(name.find("nand")){
+	cout<<"checking gate: "<<name<<endl;
+
+	if(in_vars.size()==0) {
+		cout<<"this is undriven! handle!"<<endl;
+	}
+    else if(name.find("nand")!= string::npos){
         curr_clause = nand_clause(in_vars, gate_var);
     }
-    if(name.find("and")){
+    else if(name.find("and")!= string::npos){
         curr_clause = and_clause(in_vars, gate_var);
     }
-    if(name.find("nor")){
+    else if(name.find("nor")!= string::npos){
         curr_clause = nor_clause(in_vars, gate_var);
     }
-    if(name.find("or")){
+    else if(name.find("or")!= string::npos){
         curr_clause = or_clause(in_vars, gate_var);
     }
-	if(name.find("not")){
+	else if(name.find("inv")!= string::npos){
 		curr_clause = not_clause(in_vars[0], gate_var);
 	}
-	if(name.find("buffer")){
+	else if(name.find("buffer")!= string::npos){
 		curr_clause = buffer_clause(in_vars[0], gate_var);
 	}
-	if(name.find("xnor")){
+	else if(name.find("xnor")!= string::npos){
 		curr_clause = xnor2_clause(in_vars, gate_var);
 	}
-	if(name.find("xor")){
+	else if(name.find("xor")!= string::npos){
 		curr_clause = xor2_clause(in_vars, gate_var);
 	}
 
 	// This is the case if the output of the gate is a constant. The variable name is no longer relevant because all
 	// we need to know is the constant value.
-    if (curr_clause[0][0].x == 0 || curr_clause[0][0].x == -1) {// Not sure if this will still work with Lit values
+
+	//curr_clause[0][0].x == 0 || curr_clause[0][0].x == -1
+    if ((curr_clause.size()!=0) && (curr_clause[0][0].operator==(mkLit(0)) || curr_clause[0][0].operator==(~mkLit(1)))) {// Not sure if this will still work with Lit values
 	    node->setProp("sat var",curr_clause[0][0]);
 	    node->setProp("clauses",curr_clause);
 	    return curr_clause;
@@ -270,6 +277,7 @@ int main(int argc, char **argv) {
 			hcmNode *node = (*port_itr).second->getNode();
 			if((*port_itr).second->getPort()->getDirection()==OUT){
 				hcmNode *imp_node = imp_cell_flat->getNode(node->getName());
+				//cout<<"found FF: "<<node->getName()<<" and it's friend: "<<imp_node->getName()<<endl;
 				PO_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
 				node->setProp("sat var",var_int);
 				vector<vector<Lit> > clause;
@@ -366,9 +374,10 @@ int main(int argc, char **argv) {
 	// Loop over all the POs in the spec and imp, build clauses for them and compare with sat solver
 
 	map<hcmNode*,hcmNode*>::iterator PO_map_it = PO_map.begin();
+	bool overall_equal=true;
 	for (;PO_map_it != PO_map.end(); PO_map_it++) {
-		bool is_equal;
-
+		bool is_equal=true;
+		cout<<"owner is: "<<PO_map_it->first->owner()->getName()<<endl;
 		vector<vector<Lit> > spec_clause = get_node_clauses(PO_map_it->first);
 		vector<vector<Lit> > imp_clause = get_node_clauses(PO_map_it->second);
 
@@ -418,14 +427,15 @@ int main(int argc, char **argv) {
 				is_equal == true;
 			}
 		}
-
 		// If a PO is not equal we should print it here
 		if (!is_equal) {
+			overall_equal=false;
 			cout << "There is a mismatch between the output of the spec and the output of the implementation for the output node: " << PO_map_it->first->getName() << endl;
 		}
 
 	}
-
+	if(overall_equal) cout<<"The files match!"<<endl;
+	else cout<<"The files do not match!"<<endl;
 
 }
 
