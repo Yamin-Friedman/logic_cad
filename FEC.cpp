@@ -78,8 +78,6 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
 	vector<vector<Lit> > temp_clauses;
 	res = node->getProp("clauses",temp_clauses);
 	if (res == OK) {
-		for (int i = 0 ; i < temp_clauses.size(); i++) {
-		}
 		return temp_clauses;
 	}
 
@@ -140,23 +138,23 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
     else if(name.find("and")!= string::npos){
         curr_clause = and_clause(in_vars, gate_var,node_vec);
     }
+	else if(name.find("xnor")!= string::npos){
+		curr_clause = xnor2_clause(in_vars, gate_var,node_vec);
+	}
+	else if(name.find("xor")!= string::npos){
+		curr_clause = xor2_clause(in_vars, gate_var,node_vec);
+	}
     else if(name.find("nor")!= string::npos){
         curr_clause = nor_clause(in_vars, gate_var,node_vec);
     }
     else if(name.find("or")!= string::npos){
         curr_clause = or_clause(in_vars, gate_var,node_vec);
     }
-	else if(name.find("inv")!= string::npos){
+	else if(name.find("inv")!= string::npos || name.find("not")!= string::npos){
 		curr_clause = not_clause(in_vars[0], gate_var,node_vec);
 	}
 	else if(name.find("buffer")!= string::npos){
 		curr_clause = buffer_clause(in_vars[0], gate_var,node_vec);
-	}
-	else if(name.find("xnor")!= string::npos){
-		curr_clause = xnor2_clause(in_vars, gate_var,node_vec);
-	}
-	else if(name.find("xor")!= string::npos){
-		curr_clause = xor2_clause(in_vars, gate_var,node_vec);
 	}
 
 
@@ -205,10 +203,6 @@ int main(int argc, char **argv) {
 	vector<string> imp_vlgFiles;
 	string spec_top_cell_name;
 	string imp_top_cell_name;
-
-//	for (int j = 0; j < 100; j++){
-//		cout << "int:" << j << "Lit" << mkLit(j).x << "~LIT:" << (~mkLit(j)).x << endl;
-//	}
 
 
 	parse_input(argc,argv,&spec_vlgFiles,&imp_vlgFiles,&spec_top_cell_name,&imp_top_cell_name);
@@ -383,9 +377,6 @@ int main(int argc, char **argv) {
 			var_int++;
 		}
 	}
-
-	cout << "max var_int" << var_int << endl;
-
 
 	// Loop over all the POs in the spec and imp, build clauses for them and compare with sat solver
 	spec_cell_flat->createNode("dummy");
