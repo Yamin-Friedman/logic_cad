@@ -12,7 +12,7 @@ CFLAGS=-ggdb -O0 -fPIC -I$(HCMPATH)/include -I$(MINISAT) -I$(FLAT)
 CC=g++ 
 LDFLAGS= $(MINISAT_OBJS) $(FLAT_OBJS) -L$(HCMPATH)/src -lhcm -Wl,-rpath=$(HCMPATH)/src -I$(HCMPATH)/include 
 
-FEC: FEC.o clauses.o 
+gl_verilog_fev: FEC.o clauses.o
 
 FEC.o: FEC.cpp clauses.o 
 	$(CC) -c -o $@ $< $(CXXFLAGS)
