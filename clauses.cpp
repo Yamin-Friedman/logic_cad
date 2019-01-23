@@ -212,16 +212,26 @@ vector<vector<Lit> > xor2_clause(vector<int> input_var, int output_var, vector<h
 		return buffer_clause(input_var[1],output_var,new_vec);
 	} else {
 		vector<Lit> first_clause;
-		first_clause.push_back(mkLit(output_var));
-		first_clause.push_back( mkLit(input_var[0]));
+		first_clause.push_back(~mkLit(output_var));
+		first_clause.push_back(~mkLit(input_var[0]));
 		first_clause.push_back(~mkLit(input_var[1]));
 		vector<Lit> sec_clause;
-		sec_clause.push_back(mkLit(output_var));
-		sec_clause.push_back(~mkLit(input_var[0]));
+		sec_clause.push_back(~mkLit(output_var));
+		sec_clause.push_back(mkLit(input_var[0]));
 		sec_clause.push_back(mkLit(input_var[1]));
+		vector<Lit> third_clause;
+		third_clause.push_back(mkLit(output_var));
+		third_clause.push_back(mkLit(input_var[0]));
+		third_clause.push_back(~mkLit(input_var[1]));
+		vector<Lit> fourth_clause;
+		fourth_clause.push_back(mkLit(output_var));
+		fourth_clause.push_back(~mkLit(input_var[0]));
+		fourth_clause.push_back(mkLit(input_var[1]));
 		vector<vector<Lit> > clauses;
 		clauses.push_back(first_clause);
 		clauses.push_back(sec_clause);
+		clauses.push_back(third_clause);
+		clauses.push_back(fourth_clause);
 		return clauses;
 	}
 }
