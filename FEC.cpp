@@ -65,6 +65,7 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
 	vector<vector<Lit> > clauses;
     hcmInstance* gate;
 	hcmResultTypes res;
+	vector<hcmNode*> node_vec;
 
 	// This is a recursion breaking condition of having reached a node that we already know the clauses for. This can be
 	// a PI that had its clause preset
@@ -85,7 +86,6 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
             break;
         }
     }
-	cout << "node name:" << node->getName() << endl;
     if(undriven){
 	    cout << "node name:" << node->getName() << endl;
     	cout<<"error: node is undriven. exiting"<<endl;
@@ -109,6 +109,8 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
             if (!node_clauses.empty()){
                 clauses.insert(clauses.end(),node_clauses.begin(),node_clauses.end());
             }
+
+	        node_vec.push_back(input_node);
         }
     }
 
@@ -117,44 +119,36 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
     int gate_var;
     gate->getProp("sat var",gate_var);
 	string name = gate->masterCell()->getName();
+	node_vec.push_back(node);
 
 	if(in_vars.size()==0) {
 		cout<<" handle!"<<endl;
 	}
     else if(name.find("nand")!= string::npos){
-        curr_clause = nand_clause(in_vars, gate_var);
+        curr_clause = nand_clause(in_vars, gate_var,node_vec);
     }
     else if(name.find("and")!= string::npos){
-        curr_clause = and_clause(in_vars, gate_var);
+        curr_clause = and_clause(in_vars, gate_var,node_vec);
     }
     else if(name.find("nor")!= string::npos){
-        curr_clause = nor_clause(in_vars, gate_var);
+        curr_clause = nor_clause(in_vars, gate_var,node_vec);
     }
     else if(name.find("or")!= string::npos){
-        curr_clause = or_clause(in_vars, gate_var);
+        curr_clause = or_clause(in_vars, gate_var,node_vec);
     }
 	else if(name.find("inv")!= string::npos){
-		curr_clause = not_clause(in_vars[0], gate_var);
+		curr_clause = not_clause(in_vars[0], gate_var,node_vec);
 	}
 	else if(name.find("buffer")!= string::npos){
-		curr_clause = buffer_clause(in_vars[0], gate_var);
+		curr_clause = buffer_clause(in_vars[0], gate_var,node_vec);
 	}
 	else if(name.find("xnor")!= string::npos){
-		curr_clause = xnor2_clause(in_vars, gate_var);
+		curr_clause = xnor2_clause(in_vars, gate_var,node_vec);
 	}
 	else if(name.find("xor")!= string::npos){
-		curr_clause = xor2_clause(in_vars, gate_var);
+		curr_clause = xor2_clause(in_vars, gate_var,node_vec);
 	}
 
-	// This is the case if the output of the gate is a constant. The variable name is no longer relevant because all
-	// we need to know is the constant value.
-
-	//curr_clause[0][0].x == 0 || curr_clause[0][0].x == -1
-    if ((curr_clause.size()!=0) && (curr_clause[0][0].operator==(mkLit(0)) || curr_clause[0][0].operator==(~mkLit(1)))) {// Not sure if this will still work with Lit values
-	    node->setProp("sat var",curr_clause[0][0]);
-	    node->setProp("clauses",curr_clause);
-	    return curr_clause;
-    }
 
     //finally, get final clause vec:
     clauses.insert(clauses.end(),curr_clause.begin(),curr_clause.end());
@@ -378,6 +372,7 @@ int main(int argc, char **argv) {
 
 
 	// Loop over all the POs in the spec and imp, build clauses for them and compare with sat solver
+	spec_cell_flat->createNode("dummy");
 
 	map<hcmNode*,hcmNode*>::iterator PO_map_it = PO_map.begin();
 	bool overall_equal=true;
@@ -386,27 +381,37 @@ int main(int argc, char **argv) {
 		vector<vector<Lit> > spec_clause = get_node_clauses(PO_map_it->first);
 		vector<vector<Lit> > imp_clause = get_node_clauses(PO_map_it->second);
 
-		// This should handle the special case where one of the outputs is a constant.
-		if (spec_clause[0][0].x == 0 || spec_clause[0][0].x == -1 || imp_clause[0][0].x == 0 || imp_clause[0][0].x == -1) {
-			if (spec_clause[0][0].x == imp_clause[0][0].x) {
+		// sat solver
+		vector<int> PO_vars;
+		int var;
+
+		vector<hcmNode*> node_vec;
+		node_vec.push_back(PO_map_it->first);
+		node_vec.push_back(PO_map_it->second);
+		node_vec.push_back(spec_cell_flat->getNode("dummy"));
+
+		PO_map_it->first->getProp("sat var",var);
+		PO_vars.push_back(var);
+		PO_map_it->second->getProp("sat var",var);
+		PO_vars.push_back(var);
+		vector<vector<Lit> > xor_clause = xor2_clause(PO_vars,var_int,node_vec);
+
+		vector<vector<Lit> > clauses;
+		clauses.insert(clauses.end(),spec_clause.begin(),spec_clause.end());
+		clauses.insert(clauses.end(),imp_clause.begin(),imp_clause.end());
+		clauses.insert(clauses.end(),xor_clause.begin(),xor_clause.end());
+
+		int constant = -1;
+		spec_cell_flat->getNode("dummy")->getProp("constant",constant);
+		if (constant != -1) {
+			cout << "we have found a constant output" << endl;
+			if (constant == 0) {
 				is_equal = true;
-			} else {
+			} else if (constant == 1) {
 				is_equal = false;
 			}
-		} else { // sat solver
-			vector<int> PO_vars;
-			int var;
-			PO_map_it->first->getProp("sat var",var);
-			PO_vars.push_back(var);
-			PO_map_it->second->getProp("sat var",var);
-			PO_vars.push_back(var);
-			vector<vector<Lit> > xor_clause = xor2_clause(PO_vars,var_int);
-
-			vector<vector<Lit> > clauses;
-			clauses.insert(clauses.end(),spec_clause.begin(),spec_clause.end());
-			clauses.insert(clauses.end(),imp_clause.begin(),imp_clause.end());
-			clauses.insert(clauses.end(),xor_clause.begin(),xor_clause.end());
-
+		} else {
+			cout << "we have not found a constant output" << endl;
 			Solver S;
 
 			S.verbosity = false;
@@ -416,21 +421,23 @@ int main(int argc, char **argv) {
 			for (int i = 0; i < clauses.size(); i++) {
 				vector<Lit> original = clauses[i];
 				vec<Lit> newVec(original.size());
-				for (int j=0;j<original.size();j++){
-					newVec[i]=original[i];
+				for (int j = 0; j < original.size(); j++) {
+					newVec[i] = original[i];
 				}
-			    S.addClause(newVec);
+				S.addClause(newVec);
 			}
+
 			if (!S.simplify()) {
 				is_equal == true;
 			} else {
 				is_equal == false;
 			}
+
 			if (!S.solve()) {
-				is_equal == true;
+				is_equal = true;
 				cout << "The PO:" << PO_map_it->first->getName() << " is equal" << endl;
 			} else {
-				is_equal == false;
+				is_equal = false;
 			}
 		}
 		// If a PO is not equal we should print it here
