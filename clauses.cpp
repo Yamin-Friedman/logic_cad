@@ -4,6 +4,7 @@ using namespace std;
 
 using namespace Minisat;
 
+// This function calculates the clauses for buffers. The node_vec is needed to support handling of constants.
 vector<vector<Lit> > buffer_clause(int input_var, int output_var, vector<hcmNode*> &node_vec) {
 	vector<vector<Lit> > clauses;
 	int constant = -1;
@@ -29,6 +30,7 @@ vector<vector<Lit> > buffer_clause(int input_var, int output_var, vector<hcmNode
 	return clauses;
 }
 
+// This function calculates the clauses for inverters. The node_vec is needed to support handling of constants.
 vector<vector<Lit> > not_clause(int input_var, int output_var, vector<hcmNode*> &node_vec) {
 	vector<vector<Lit> > clauses;
 	int constant = -1;
@@ -54,6 +56,7 @@ vector<vector<Lit> > not_clause(int input_var, int output_var, vector<hcmNode*> 
 	return clauses;
 }
 
+// This function calculates the clauses for and. The node_vec is needed to support handling of constants.
 vector<vector<Lit> > and_clause(vector<int> input_var, int output_var, vector<hcmNode*> &node_vec) {
 	vector<vector<Lit> > clauses;
 	vector<Lit> sum_clause(1,mkLit(output_var));
@@ -83,6 +86,7 @@ vector<vector<Lit> > and_clause(vector<int> input_var, int output_var, vector<hc
 	return clauses;
 }
 
+// This function calculates the clauses for nand. The node_vec is needed to support handling of constants.
 vector<vector<Lit> > nand_clause(vector<int> input_var, int output_var, vector<hcmNode*> &node_vec) {
 	vector<vector<Lit> > clauses;
 	vector<Lit> sum_clause(1,~mkLit(output_var));
@@ -112,6 +116,7 @@ vector<vector<Lit> > nand_clause(vector<int> input_var, int output_var, vector<h
 	return clauses;
 }
 
+// This function calculates the clauses for or. The node_vec is needed to support handling of constants.
 vector<vector<Lit> > or_clause(vector<int> input_var, int output_var, vector<hcmNode*> &node_vec) {
 	vector<vector<Lit> > clauses;
 	vector<Lit> sum_clause(1,~mkLit(output_var));
@@ -141,6 +146,7 @@ vector<vector<Lit> > or_clause(vector<int> input_var, int output_var, vector<hcm
 	return clauses;
 }
 
+// This function calculates the clauses for nor. The node_vec is needed to support handling of constants.
 vector<vector<Lit> > nor_clause(vector<int> input_var, int output_var, vector<hcmNode*> &node_vec) {
 	vector<vector<Lit> > clauses;
 	vector<Lit> sum_clause(1,mkLit(output_var));
@@ -170,6 +176,7 @@ vector<vector<Lit> > nor_clause(vector<int> input_var, int output_var, vector<hc
 	return clauses;
 }
 
+// This function calculates the clauses for two input xnor. The node_vec is needed to support handling of constants.
 vector<vector<Lit> > xnor2_clause(vector<int> input_var, int output_var, vector<hcmNode*> &node_vec) {
 	int constant = -1;
 	node_vec[0]->getProp("constant",constant);
@@ -185,19 +192,30 @@ vector<vector<Lit> > xnor2_clause(vector<int> input_var, int output_var, vector<
 	} else {
 		vector<Lit> first_clause;
 		first_clause.push_back(mkLit(output_var));
-		first_clause.push_back(mkLit(input_var[0]));
-		first_clause.push_back(mkLit(input_var[1]));
+		first_clause.push_back(~mkLit(input_var[0]));
+		first_clause.push_back(~mkLit(input_var[1]));
 		vector<Lit> sec_clause;
 		sec_clause.push_back(mkLit(output_var));
-		sec_clause.push_back(~mkLit(input_var[0]));
-		sec_clause.push_back(~mkLit(input_var[1]));
+		sec_clause.push_back(mkLit(input_var[0]));
+		sec_clause.push_back(mkLit(input_var[1]));
+		vector<Lit> third_clause;
+		third_clause.push_back(~mkLit(output_var));
+		third_clause.push_back(mkLit(input_var[0]));
+		third_clause.push_back(~mkLit(input_var[1]));
+		vector<Lit> fourth_clause;
+		fourth_clause.push_back(~mkLit(output_var));
+		fourth_clause.push_back(~mkLit(input_var[0]));
+		fourth_clause.push_back(mkLit(input_var[1]));
 		vector<vector<Lit> > clauses;
 		clauses.push_back(first_clause);
 		clauses.push_back(sec_clause);
+		clauses.push_back(third_clause);
+		clauses.push_back(fourth_clause);
 		return clauses;
 	}
 }
 
+// This function calculates the clauses for two input xor. The node_vec is needed to support handling of constants.
 vector<vector<Lit> > xor2_clause(vector<int> input_var, int output_var, vector<hcmNode*> &node_vec) {
 	int constant = -1;
 	node_vec[0]->getProp("constant",constant);
