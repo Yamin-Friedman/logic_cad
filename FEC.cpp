@@ -26,29 +26,30 @@ using namespace std;
 bool verbose = false;
 
 
+// A recursive function that calculates the clauses for each node based on the clauses of the nodes leading to it until we reach
+// a PI
 vector<vector<Lit> > get_node_clauses(hcmNode* node) {
 	vector<vector<Lit> > clauses;
     hcmInstance* gate;
 	hcmResultTypes res;
 	vector<hcmNode*> node_vec;
 
-
+	// This is a recursion breaking condition of having reached a PI. Returns an empty clause.
 	bool is_PI = false;
 	node->getProp("PI",is_PI);
 	if (is_PI) {
 		return clauses;
 	}
-	// This is a recursion breaking condition of having reached a node that we already know the clauses for. This can be
-	// a PI that had its clause preset
+
+	// This is a recursion breaking condition of having reached a node that we already know the clauses for.
 	vector<vector<Lit> > temp_clauses;
 	res = node->getProp("clauses",temp_clauses);
 	if (res == OK) {
 		return temp_clauses;
 	}
 
-//	cout << "enter get node clauses node name:" << node->getName() << endl;
 	//Find gate pushing the node (only one)
-	bool undriven=true;
+	bool undriven=true; // This checks to see if there is no gate pushing the node
     map<string, hcmInstPort* > InstPorts = node->getInstPorts();
     map<string,hcmInstPort*>::iterator iter;
     for (iter=InstPorts.begin();iter!=InstPorts.end();iter++){ //go over node's instPorts
@@ -71,16 +72,15 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
     map<string,hcmInstPort*>::iterator g_iter;
     for (g_iter=InstPorts_gate.begin();g_iter!=InstPorts_gate.end();g_iter++){ //go over node's instPorts
         hcmPort *port= (*g_iter).second->getPort();
-        //cout<<"dir is: "<<port->getDirection()<<"and name is: "<<port->getName()<<endl;
         if(port!=NULL && port->getDirection()==IN){
             //if port pushes a gate, need to get its clauses, add to in_vars:
             hcmNode* input_node = (*g_iter).second->getNode();
             int var;
 	        input_node->getProp("sat var",var);
             in_vars.push_back(var);
+	        // Recursively gets the clauses for all the input nodes
             vector<vector<Lit> > node_clauses = get_node_clauses(input_node);
             if (!node_clauses.empty()){
-
                 clauses.insert(clauses.end(),node_clauses.begin(),node_clauses.end());
             }
 
@@ -95,10 +95,7 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
 	string name = gate->masterCell()->getName();
 	node_vec.push_back(node);
 
-	if(in_vars.size()==0) {
-		cout<<" handle!"<<endl;
-	}
-    else if(name.find("nand")!= string::npos){
+	if(name.find("nand")!= string::npos){
         curr_clause = nand_clause(in_vars, gate_var,node_vec);
     }
     else if(name.find("and")!= string::npos){
@@ -131,6 +128,7 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
 	return clauses;
 }
 
+// Parses the input and makes sure that it is in the right format
 void parse_input(int argc, char **argv, vector<string> *spec_vlgFiles, vector<string> *implementation_vlgFiles,
                  string *spec_top_cell_name, string *implementation_top_cell_name) {
 	vector<string> *vlgFiles_ptr = NULL;
@@ -199,6 +197,7 @@ int main(int argc, char **argv) {
 	hcmCell *spec_top_cell = spec_design->getCell(spec_top_cell_name);
 	hcmCell *imp_top_cell = imp_design->getCell(imp_top_cell_name);
 
+	// We use flat models to simplify the algorithms
 	hcmCell *spec_cell_flat = hcmFlatten(spec_top_cell_name + "_flat",spec_top_cell,globalNodes);
 	hcmCell *imp_cell_flat = hcmFlatten(imp_top_cell_name + "_flat",imp_top_cell,globalNodes);
 
@@ -330,7 +329,8 @@ int main(int argc, char **argv) {
 	}
 
 	// Loop over all the POs in the spec and imp, build clauses for them and compare with sat solver
-	spec_cell_flat->createNode("dummy");
+
+	spec_cell_flat->createNode("dummy"); // This is needed in case the output is a constant value
 
 	map<hcmNode*,hcmNode*>::iterator PO_map_it = PO_map.begin();
 	bool overall_equal=true;
@@ -364,6 +364,8 @@ int main(int argc, char **argv) {
 
 		int constant = -1;
 		spec_cell_flat->getNode("dummy")->getProp("constant",constant);
+
+		// This is the case that the output is a constant
 		if (constant != -1) {
 			if (constant == 0) {
 				is_equal = true;
@@ -377,10 +379,14 @@ int main(int argc, char **argv) {
 			for (int i = 0; i < var_int + 1; i++) {
 				S.newVar();
 			}
+
+			// This switches all the vectors to vecs. We found this to be neccessary because it doesn't seem that vecs
+			// have copy constructors.
 			for (int i = 0; i < clauses.size(); i++) {
 				vector<Lit> original = clauses[i];
 				vec<Lit> newVec;
 				for (int j = 0; j < original.size(); j++) {
+					cout << "original x:" << original[j].x << endl;
 					int p;
 					if ( original[j].x % 2 == 1) {
 						p = (original[j].x - 1) / 2;
@@ -392,12 +398,12 @@ int main(int argc, char **argv) {
 					}
 					//cout<<p<<endl;
 				}
+				cout << "new clause" << endl;
 				S.addClause(newVec);
 			}
 
 			S.addClause(mkLit(var_int));
 
-			//cout << "before solve" << endl;
 			if (!S.solve()) {
 				is_equal = true;
 				cout << "The PO:" << PO_map_it->first->getName() << " is equal" << endl;
