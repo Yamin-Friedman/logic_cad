@@ -25,41 +25,6 @@ using namespace std;
 
 bool verbose = false;
 
-void find_all_FFs(hcmNode *OutNode,map<string,hcmInstance*> &FFs){
-
-	map<string,hcmInstPort*> ports = OutNode->getInstPorts();
-    map<string,hcmInstPort*>::iterator itr=ports.begin();
-    hcmInstance *gate;
-    bool InNode=false;
-
-    for(;itr!=ports.end();itr++){
-        if ((*itr).second->getPort()->getDirection()==OUT) {
-            gate = (*itr).second->getInst();
-            string name = gate->masterCell()->getName();
-            if (name.find("buffer")==string::npos && (name.find("ff")!= string::npos) && FFs.find(name) == FFs.end()) {
-            	string name = (*itr).second->getInst()->getName();
-				FFs.insert(pair<string,hcmInstance*>(name,(*itr).second->getInst()));
-            }
-            break;
-        }
-        InNode=true; //this node is the final one - not pushed by anything
-    }
-
-    if(InNode) return; //this node is the final one - not pushed by anything
-
-    //check on the gates pushing the node:
-    map<string, hcmInstPort* > InstPorts_gate = gate->getInstPorts();
-    map<string,hcmInstPort*>::iterator g_iter;
-    for (g_iter=InstPorts_gate.begin();g_iter!=InstPorts_gate.end();g_iter++){
-        hcmPort *port= (*g_iter).second->getPort();
-        if(port->getDirection()==IN){
-            //if port pushes a gate, need to traverse:
-            hcmNode* node = (*g_iter).second->getNode();
-            find_all_FFs(node,FFs);
-        }
-    }
-
-}
 
 vector<vector<Lit> > get_node_clauses(hcmNode* node) {
 	vector<vector<Lit> > clauses;
@@ -115,6 +80,7 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
             in_vars.push_back(var);
             vector<vector<Lit> > node_clauses = get_node_clauses(input_node);
             if (!node_clauses.empty()){
+
                 clauses.insert(clauses.end(),node_clauses.begin(),node_clauses.end());
             }
 
@@ -252,63 +218,48 @@ int main(int argc, char **argv) {
 
 	int var_int = 0;
 
-	//create a map with all the nodes in the spec circuit:
-	map<string,hcmInstance*> FFs;
 
-    map<string,hcmNode*>spec_map = spec_top_cell->getNodes();
-	map<string,hcmNode*>::iterator map_itr = spec_map.begin();
-	for (;map_itr!= spec_map.end(); map_itr++) {
-		hcmNode *spec_node = (*map_itr).second;
-		if (spec_node->getPort()!=NULL){
-			//traverse on each output node and find FFs (TODO:can shorten now that we have flat):
-			if ((spec_node->getPort()->getDirection()) == OUT) {
-				//we want to traverse on flat model:
-				hcmNode* flat_spec_node = spec_cell_flat->getNode(spec_node->getName());
-				find_all_FFs(flat_spec_node, FFs);
+    // go over all instances in circuit and find FF:
+
+    map<string,hcmInstance*> allInst = spec_cell_flat->getInstances();
+    map<string,hcmInstance*>::iterator all_itr=allInst.begin();
+    for(;all_itr!=allInst.end();all_itr++){
+    	hcmCell* master = all_itr->second->masterCell();
+    	if(master->getName().find("ff")!=string::npos && master->getName().find("buffer")==string::npos){
+
+    		map<string, hcmInstPort*> instPorts =all_itr->second->getInstPorts();
+			map<string,hcmInstPort*>::iterator port_itr = instPorts.begin();
+			for (;port_itr!=instPorts.end();port_itr++){
+				hcmNode *node = (*port_itr).second->getNode();
+				hcmPort* port = (*port_itr).second->getPort();
+				if (port==NULL){
+					continue;
+				}
+				else if((*port_itr).second->getPort()->getDirection()==IN && port->owner()->getName()!="CLK" && node->getPort()==NULL){
+					hcmNode *imp_node = imp_cell_flat->getNode(node->getName());
+					PO_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
+					node->setProp("sat var",var_int);
+					var_int++;
+					imp_node->setProp("sat var",var_int);
+					var_int++;
+				}
+				else if((*port_itr).second->getPort()->getDirection()==OUT && node->getName().find("CLK")==string::npos){
+					hcmNode *imp_node = imp_cell_flat->getNode(node->getName());
+					PI_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
+					node->setProp("sat var",var_int);
+					node->setProp("PI",true);
+					imp_node->setProp("sat var",var_int);
+					imp_node->setProp("PI",true);
+					var_int++;
+				}
+
 			}
-		}
-
-	}
-
+    	}
+    }
 
 
 
-	//Add all FFs outputs to PO map, FF inputs to PI map
-	//TODO: check that FF names actually match between spec and imp!!
-	map<string,hcmInstance*>::iterator itr = FFs.begin();
-	for (;itr!=FFs.end();itr++){
-		hcmInstance* inst  = (*itr).second;
-		string inst_name = (*itr).first;
-		map<string, hcmInstPort*> instPorts = inst->getInstPorts();
-		map<string,hcmInstPort*>::iterator port_itr = instPorts.begin();
-		for (;port_itr!=instPorts.end();port_itr++){
-			hcmNode *node = (*port_itr).second->getNode();
-			hcmPort* port = (*port_itr).second->getPort();
-			if (port==NULL){
-				continue;
-			}
-			else if((*port_itr).second->getPort()->getDirection()==IN && port->owner()->getName()!="CLK"){
-				hcmNode *imp_node = imp_cell_flat->getNode(node->getName());
-				//cout<<"found FF: "<<node->getName()<<" and it's friend: "<<imp_node->getName()<<endl;
-				PO_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
-				node->setProp("sat var",var_int);
-				var_int++;
-				imp_node->setProp("sat var",var_int);
-				var_int++;
-			}
-			else if((*port_itr).second->getPort()->getDirection()==OUT){
-				hcmNode *imp_node = imp_cell_flat->getNode(node->getName());
-				PI_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
-				node->setProp("sat var",var_int);
-				node->setProp("PI",true);
-				imp_node->setProp("sat var",var_int);
-				imp_node->setProp("PI",true);
-				var_int++;
-			}
 
-		}
-
-	}
 
 	//map the rest of the PO, PI and give int_vars to all nodes:
 	map<string,hcmNode*>::iterator map_it = spec_cell_flat->getNodes().begin();
@@ -439,13 +390,14 @@ int main(int argc, char **argv) {
 						p = original[j].x / 2;
 						newVec.push(mkLit(p));
 					}
+					//cout<<p<<endl;
 				}
 				S.addClause(newVec);
 			}
 
 			S.addClause(mkLit(var_int));
 
-			cout << "before solve" << endl;
+			//cout << "before solve" << endl;
 			if (!S.solve()) {
 				is_equal = true;
 				cout << "The PO:" << PO_map_it->first->getName() << " is equal" << endl;

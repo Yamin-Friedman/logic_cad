@@ -27,8 +27,8 @@ std::vector<std::vector<Minisat::Lit> > or_clause(std::vector<int> input_var, in
 
 std::vector<std::vector<Minisat::Lit> > nor_clause(std::vector<int> input_var, int output_var, std::vector< hcmNode* > &node_vec);
 
-std::vector<std::vector<Minisat::Lit> > xnor2_clause(std::vector<int> input_var, int output_var, std::vector< hcmNode* > &node_vec);
-
 std::vector<std::vector<Minisat::Lit> > xor2_clause(std::vector<int> input_var, int output_var, std::vector< hcmNode* > &node_vec);
+
+std::vector<std::vector<Minisat::Lit> > xnor2_clause(std::vector<int> input_var, int output_var, std::vector< hcmNode* > &node_vec);
 
 #endif //CLAUSES_H

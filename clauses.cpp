@@ -170,7 +170,7 @@ vector<vector<Lit> > nor_clause(vector<int> input_var, int output_var, vector<hc
 	return clauses;
 }
 
-vector<vector<Lit> > xnor2_clause(vector<int> input_var, int output_var, vector<hcmNode*> &node_vec) {
+/*vector<vector<Lit> > xnor2_clause(vector<int> input_var, int output_var, vector<hcmNode*> &node_vec) {
 	int constant = -1;
 	node_vec[0]->getProp("constant",constant);
 
@@ -197,7 +197,7 @@ vector<vector<Lit> > xnor2_clause(vector<int> input_var, int output_var, vector<
 		return clauses;
 	}
 }
-
+*/
 vector<vector<Lit> > xor2_clause(vector<int> input_var, int output_var, vector<hcmNode*> &node_vec) {
 	int constant = -1;
 	node_vec[0]->getProp("constant",constant);
@@ -234,5 +234,44 @@ vector<vector<Lit> > xor2_clause(vector<int> input_var, int output_var, vector<h
 		clauses.push_back(fourth_clause);
 		return clauses;
 	}
+}
+
+vector<vector<Lit> > xnor2_clause(vector<int> input_var, int output_var, vector<hcmNode*> &node_vec) {
+	int constant = -1;
+	node_vec[0]->getProp("constant",constant);
+
+	if (constant != -1 && constant == 1) {
+		vector<hcmNode*> new_vec;
+		new_vec.insert(node_vec.begin() + 1,node_vec.end(),new_vec.end());
+		return not_clause(input_var[1],output_var,new_vec);
+	} else if (constant != -1 && constant == 0) {
+		vector<hcmNode*> new_vec;
+		new_vec.insert(new_vec.end(),node_vec.begin() + 1,node_vec.end());
+		return buffer_clause(input_var[1],output_var,new_vec);
+	} else {
+		vector<Lit> first_clause;
+		first_clause.push_back(~mkLit(output_var));
+		first_clause.push_back(mkLit(input_var[0]));
+		first_clause.push_back(~mkLit(input_var[1]));
+		vector<Lit> sec_clause;
+		sec_clause.push_back(~mkLit(output_var));
+		sec_clause.push_back(~mkLit(input_var[0]));
+		sec_clause.push_back(mkLit(input_var[1]));
+		vector<Lit> third_clause;
+		third_clause.push_back(mkLit(output_var));
+		third_clause.push_back(~mkLit(input_var[0]));
+		third_clause.push_back(~mkLit(input_var[1]));
+		vector<Lit> fourth_clause;
+		fourth_clause.push_back(mkLit(output_var));
+		fourth_clause.push_back(mkLit(input_var[0]));
+		fourth_clause.push_back(mkLit(input_var[1]));
+		vector<vector<Lit> > clauses;
+		clauses.push_back(first_clause);
+		clauses.push_back(sec_clause);
+		clauses.push_back(third_clause);
+		clauses.push_back(fourth_clause);
+		return clauses;
+	}
+
 }
 
