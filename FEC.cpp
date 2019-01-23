@@ -74,14 +74,20 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
 	}
 
 	//Find gate pushing the node (only one)
+	bool undriven=true;
     map<string, hcmInstPort* > InstPorts = node->getInstPorts();
     map<string,hcmInstPort*>::iterator iter;
     for (iter=InstPorts.begin();iter!=InstPorts.end();iter++){ //go over node's instPorts
         hcmPort *port= (*iter).second->getPort();
-        if(port->getDirection()==OUT){ //if port pushes a gate
+        if(port!=NULL && port->getDirection()==OUT){ //if port pushes a gate
             gate = (*iter).second->getInst();
+            if(gate!=NULL) undriven=false;
             break;
         }
+    }
+    if(undriven){
+    	cout<<"error: node is undriven. exiting"<<endl;
+    	exit(-1);
     }
 
 	//find the in-nodes of the gate:
@@ -90,9 +96,9 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
     map<string,hcmInstPort*>::iterator g_iter;
     for (g_iter=InstPorts.begin();g_iter!=InstPorts.end();g_iter++){ //go over node's instPorts
         hcmPort *port= (*g_iter).second->getPort();
-        if(port->getDirection()==IN){
+        //cout<<"dir is: "<<port->getDirection()<<"and name is: "<<port->getName()<<endl;
+        if(port!=NULL && port->getDirection()==IN){
             //if port pushes a gate, need to get its clauses, add to in_vars:
-            cout<<"found in port"<<endl;
             hcmNode* input_node = (*g_iter).second->getNode();
             int var;
 	        input_node->getProp("sat var",var);
@@ -110,10 +116,9 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
     gate->getProp("sat var",gate_var);
 	string name = gate->masterCell()->getName();
 
-	cout<<"checking gate: "<<name<<endl;
 
 	if(in_vars.size()==0) {
-		cout<<"this is undriven! handle!"<<endl;
+		cout<<" handle!"<<endl;
 	}
     else if(name.find("nand")!= string::npos){
         curr_clause = nand_clause(in_vars, gate_var);
@@ -275,7 +280,11 @@ int main(int argc, char **argv) {
 		map<string,hcmInstPort*>::iterator port_itr = instPorts.begin();
 		for (;port_itr!=instPorts.end();port_itr++){
 			hcmNode *node = (*port_itr).second->getNode();
-			if((*port_itr).second->getPort()->getDirection()==OUT){
+			hcmPort* port = (*port_itr).second->getPort();
+			if (port==NULL){
+				continue;
+			}
+			else if((*port_itr).second->getPort()->getDirection()==IN && port->owner()->getName()!="CLK"){
 				hcmNode *imp_node = imp_cell_flat->getNode(node->getName());
 				//cout<<"found FF: "<<node->getName()<<" and it's friend: "<<imp_node->getName()<<endl;
 				PO_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
@@ -287,7 +296,7 @@ int main(int argc, char **argv) {
 				imp_node->setProp("clauses",clause);
 				var_int++;
 			}
-			else if((*port_itr).second->getPort()->getDirection()==IN){
+			else if((*port_itr).second->getPort()->getDirection()==OUT){
 				hcmNode *imp_node = imp_cell_flat->getNode(node->getName());
 				PI_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
 				node->setProp("sat var",var_int);
@@ -311,7 +320,8 @@ int main(int argc, char **argv) {
         if((PO_map.find(spec_node)!=PO_map.end())||(PI_map.find(spec_node)!=PI_map.end())) continue;
 
         //if this is a true top input node:
-		else if (spec_node->getPort()!=NULL &&(spec_node->getPort()->getDirection() == IN) && (spec_top_nodes.find(spec_node->getName())!=spec_top_nodes.end())) {
+
+		else if (spec_node->getPort()!=NULL &&(spec_node->getPort()->getDirection() == IN)) {
 			hcmNode *imp_node = imp_cell_flat->getNode(spec_node->getName());
 			PI_map.insert(pair<hcmNode*,hcmNode*>(spec_node,imp_node));
 			spec_node->setProp("sat var",var_int);
@@ -323,7 +333,7 @@ int main(int argc, char **argv) {
 			var_int++;
 
 		//if this is a true top output node:
-		} else if (spec_node->getPort()!=NULL &&(spec_node->getPort()->getDirection() == OUT) && (spec_top_nodes.find(spec_node->getName())!=spec_top_nodes.end())) {
+		} else if (spec_node->getPort()!=NULL &&(spec_node->getPort()->getDirection() == OUT)) {
 			hcmNode *imp_node = imp_cell_flat->getNode(spec_node->getName());
 			PO_map.insert(pair<hcmNode*,hcmNode*>(spec_node,imp_node));
 			spec_node->setProp("sat var",var_int);
@@ -377,7 +387,6 @@ int main(int argc, char **argv) {
 	bool overall_equal=true;
 	for (;PO_map_it != PO_map.end(); PO_map_it++) {
 		bool is_equal=true;
-		cout<<"owner is: "<<PO_map_it->first->owner()->getName()<<endl;
 		vector<vector<Lit> > spec_clause = get_node_clauses(PO_map_it->first);
 		vector<vector<Lit> > imp_clause = get_node_clauses(PO_map_it->second);
 
