@@ -8,6 +8,9 @@ vector<vector<Lit> > buffer_clause(int input_var, int output_var, vector<hcmNode
 	vector<vector<Lit> > clauses;
 	int constant = -1;
 	node_vec[0]->getProp("constant",constant);
+	if(constant != -1) {
+		cout << "there is a constant" << endl;
+	}
 
 	if (constant != -1 && constant == 0) {
 		clauses.push_back(vector<Lit>(1,~mkLit(output_var)));
@@ -33,6 +36,9 @@ vector<vector<Lit> > not_clause(int input_var, int output_var, vector<hcmNode*> 
 	vector<vector<Lit> > clauses;
 	int constant = -1;
 	node_vec[0]->getProp("constant",constant);
+	if(constant != -1) {
+		cout << "there is a constant" << endl;
+	}
 
 	if (constant != -1 && constant == 0) {
 		clauses.push_back(vector<Lit>(1,mkLit(output_var)));
@@ -61,6 +67,9 @@ vector<vector<Lit> > and_clause(vector<int> input_var, int output_var, vector<hc
 
 	for (int i = 0; i < input_var.size(); i++) {
 		node_vec[i]->getProp("constant",constant);
+		if(constant != -1) {
+			cout << "there is a constant" << endl;
+		}
 
 		if (constant != -1 && constant == 0) {
 			node_vec[node_vec.size() - 1]->setProp("constant",0);
@@ -90,6 +99,9 @@ vector<vector<Lit> > nand_clause(vector<int> input_var, int output_var, vector<h
 
 	for (int i = 0; i < input_var.size(); i++) {
 		node_vec[i]->getProp("constant",constant);
+		if(constant != -1) {
+			cout << "there is a constant" << endl;
+		}
 
 		if (constant != -1 && constant == 0) {
 			node_vec[node_vec.size() - 1]->setProp("constant",1);
@@ -120,6 +132,10 @@ vector<vector<Lit> > or_clause(vector<int> input_var, int output_var, vector<hcm
 	for (int i = 0; i < input_var.size(); i++) {
 		node_vec[i]->getProp("constant",constant);
 
+		if(constant != -1) {
+			cout << "there is a constant" << endl;
+		}
+
 		if (constant != -1 && constant == 1) {
 			node_vec[node_vec.size() - 1]->setProp("constant",1);
 			return vector<vector<Lit> >(1,vector<Lit>(1,mkLit(output_var)));
@@ -148,6 +164,9 @@ vector<vector<Lit> > nor_clause(vector<int> input_var, int output_var, vector<hc
 
 	for (int i = 0; i < input_var.size(); i++) {
 		node_vec[i]->getProp("constant",constant);
+		if(constant != -1) {
+			cout << "there is a constant" << endl;
+		}
 
 		if (constant != -1 && constant == 1) {
 			node_vec[node_vec.size() - 1]->setProp("constant",0);
@@ -173,6 +192,9 @@ vector<vector<Lit> > nor_clause(vector<int> input_var, int output_var, vector<hc
 vector<vector<Lit> > xnor2_clause(vector<int> input_var, int output_var, vector<hcmNode*> &node_vec) {
 	int constant = -1;
 	node_vec[0]->getProp("constant",constant);
+	if(constant != -1) {
+		cout << "there is a constant" << endl;
+	}
 
 	if (constant != -1 && constant == 1) {
 		vector<hcmNode*> new_vec;
@@ -201,6 +223,9 @@ vector<vector<Lit> > xnor2_clause(vector<int> input_var, int output_var, vector<
 vector<vector<Lit> > xor2_clause(vector<int> input_var, int output_var, vector<hcmNode*> &node_vec) {
 	int constant = -1;
 	node_vec[0]->getProp("constant",constant);
+	if(constant != -1) {
+		cout << "there is a constant" << endl;
+	}
 
 	if (constant != -1 && constant == 1) {
 		vector<hcmNode*> new_vec;

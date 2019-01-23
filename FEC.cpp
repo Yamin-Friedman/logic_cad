@@ -67,13 +67,27 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
 	hcmResultTypes res;
 	vector<hcmNode*> node_vec;
 
-	// This is a recursion breaking condition of having reached a node that we already know the clauses for. This can be
-	// a PI that had its clause preset
-	res = node->getProp("clauses",clauses);
-	if (res == OK) {
+
+	bool is_PI = false;
+	node->getProp("PI",is_PI);
+	if (is_PI) {
+		cout << "reached PI:" << node->getName() << endl;
 		return clauses;
 	}
+	// This is a recursion breaking condition of having reached a node that we already know the clauses for. This can be
+	// a PI that had its clause preset
+	vector<vector<Lit> > temp_clauses;
+	res = node->getProp("clauses",temp_clauses);
+	if (res == OK) {
+		cout << "Already calced node" << node->getName() << endl;
+		cout << "size of clauses:" << temp_clauses.size() << endl;
+		for (int i = 0 ; i < temp_clauses.size(); i++) {
+			cout << "size of clause:" << temp_clauses[i].size() << endl;
+		}
+		return temp_clauses;
+	}
 
+	cout << "enter get node clauses node name:" << node->getName() << endl;
 	//Find gate pushing the node (only one)
 	bool undriven=true;
     map<string, hcmInstPort* > InstPorts = node->getInstPorts();
@@ -235,14 +249,14 @@ int main(int argc, char **argv) {
 
 	//save a map of top cell nodes (not flattened):
 	map<string,hcmNode*> spec_top_nodes = spec_top_cell->getNodes();
-	map<string,hcmNode*> imp_top_nodes=imp_top_cell->getNodes();
+	map<string,hcmNode*> imp_top_nodes = imp_top_cell->getNodes();
 
 
 
 	// We can also set the sat var for each node here. It doesn't matter what the order of the variables are assigned in
 	// as long as there is a match between primary inputs
 
-	int var_int = 1;
+	int var_int = 0;
 
 	//create a map with all the nodes in the spec circuit:
 	map<string,hcmInstance*> FFs;
@@ -292,11 +306,9 @@ int main(int argc, char **argv) {
 				hcmNode *imp_node = imp_cell_flat->getNode(node->getName());
 				PI_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
 				node->setProp("sat var",var_int);
-				vector<vector<Lit> > clause;
-				clause.push_back(vector<Lit>(1,mkLit(var_int)));
-				node->setProp("clauses",clause);
+				node->setProp("PI",true);
 				imp_node->setProp("sat var",var_int);
-				imp_node->setProp("clauses",clause);
+				imp_node->setProp("PI",true);
 				var_int++;
 			}
 
@@ -317,13 +329,9 @@ int main(int argc, char **argv) {
 			hcmNode *imp_node = imp_cell_flat->getNode(spec_node->getName());
 			PI_map.insert(pair<hcmNode*,hcmNode*>(spec_node,imp_node));
 			spec_node->setProp("sat var",var_int);
-			vector<vector<Lit> > clause;
-			clause.push_back(vector<Lit>(1,mkLit(var_int)));
-			int res = spec_node->setProp("clauses",clause);
+			spec_node->setProp("PI",true);
 			imp_node->setProp("sat var",var_int);
-			imp_node->setProp("clauses",clause);
-	        vector<vector<Lit> > clause_tmp;
-	        spec_node->getProp("clauses", clause_tmp);
+			imp_node->setProp("PI",true);
 			var_int++;
 
 		//if this is a true top output node:
@@ -341,19 +349,25 @@ int main(int argc, char **argv) {
 
 		if (spec_node->getName() == "VDD") {
 			vector<vector<Lit> > clause;
-			clause.push_back(vector<Lit>(1,~mkLit(1)));
+			clause.push_back(vector<Lit>(1,mkLit(var_int)));
 			spec_node->setProp("constant", 1);
-			spec_node->setProp("clauses",clause);// -1 is a special value that means the node is a constant 1
+			spec_node->setProp("clauses",clause);
+			spec_node->setProp("sat var",var_int);
+			imp_cell_flat->getNode(spec_node->getName())->setProp("sat var",var_int);
 			imp_cell_flat->getNode(spec_node->getName())->setProp("constant", 1);
 			imp_cell_flat->getNode(spec_node->getName())->setProp("clauses", clause);
+			var_int++;
 		}
 		if (spec_node->getName() == "VSS") {
 			vector<vector<Lit> > clause;
-			clause.push_back(vector<Lit>(1,mkLit(0)));
+			clause.push_back(vector<Lit>(1,~mkLit(var_int)));
 			spec_node->setProp("constant", 0);
-			spec_node->setProp("clauses",clause);// 0 is a special value that means the node is a constant 0
+			spec_node->setProp("clauses",clause);
+			spec_node->setProp("sat var",var_int);
+			imp_cell_flat->getNode(spec_node->getName())->setProp("sat var",var_int);
 			imp_cell_flat->getNode(spec_node->getName())->setProp("constant", 0);
 			imp_cell_flat->getNode(spec_node->getName())->setProp("clauses", clause);
+			var_int++;
 		}
 	}
 
@@ -404,34 +418,32 @@ int main(int argc, char **argv) {
 		int constant = -1;
 		spec_cell_flat->getNode("dummy")->getProp("constant",constant);
 		if (constant != -1) {
-			cout << "we have found a constant output" << endl;
 			if (constant == 0) {
 				is_equal = true;
 			} else if (constant == 1) {
 				is_equal = false;
 			}
 		} else {
-			cout << "we have not found a constant output" << endl;
+			cout << "enter solver for output node:" << PO_map_it->first->getName() << endl;
 			Solver S;
 
 			S.verbosity = false;
-			for (int i = 2; i < var_int; i++) {
+			for (int i = 0; i < var_int; i++) {
 				S.newVar();
 			}
 			for (int i = 0; i < clauses.size(); i++) {
 				vector<Lit> original = clauses[i];
-				vec<Lit> newVec(original.size());
+				vec<Lit> newVec;
 				for (int j = 0; j < original.size(); j++) {
-					newVec[j] = original[j];
+					cout << "before push" << endl;
+					Lit p;
+					p.x = original[j].x;
+					newVec.push(mkLit(j));
 				}
+				cout << "before add clause" << endl;
 				S.addClause(newVec);
 			}
 
-			if (!S.simplify()) {
-				is_equal == true;
-			} else {
-				is_equal == false;
-			}
 
 			if (!S.solve()) {
 				is_equal = true;
@@ -444,7 +456,7 @@ int main(int argc, char **argv) {
 		if (!is_equal) {
 			overall_equal=false;
 			cout << "There is a mismatch between the output of the spec and the output of the implementation for the output node: " << PO_map_it->first->getName() << endl;
-			exit(-1);
+//			exit(-1);
 		}
 
 	}
