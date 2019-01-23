@@ -85,7 +85,9 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
             break;
         }
     }
+	cout << "node name:" << node->getName() << endl;
     if(undriven){
+	    cout << "node name:" << node->getName() << endl;
     	cout<<"error: node is undriven. exiting"<<endl;
     	exit(-1);
     }
@@ -344,18 +346,20 @@ int main(int argc, char **argv) {
 		}
 
 		if (spec_node->getName() == "VDD") {
-			vector<vector<int> > clause;
-			clause.push_back(vector<int>(1,-1));
+			vector<vector<Lit> > clause;
+			clause.push_back(vector<Lit>(1,~mkLit(1)));
 			spec_node->setProp("constant", 1);
 			spec_node->setProp("clauses",clause);// -1 is a special value that means the node is a constant 1
 			imp_cell_flat->getNode(spec_node->getName())->setProp("constant", 1);
+			imp_cell_flat->getNode(spec_node->getName())->setProp("clauses", clause);
 		}
 		if (spec_node->getName() == "VSS") {
-			vector<vector<int> > clause;
-			clause.push_back(vector<int>(1,0));
+			vector<vector<Lit> > clause;
+			clause.push_back(vector<Lit>(1,mkLit(0)));
 			spec_node->setProp("constant", 0);
 			spec_node->setProp("clauses",clause);// 0 is a special value that means the node is a constant 0
 			imp_cell_flat->getNode(spec_node->getName())->setProp("constant", 0);
+			imp_cell_flat->getNode(spec_node->getName())->setProp("clauses", clause);
 		}
 	}
 
@@ -396,12 +400,12 @@ int main(int argc, char **argv) {
 			PO_vars.push_back(var);
 			PO_map_it->second->getProp("sat var",var);
 			PO_vars.push_back(var);
-			vector<vector<Lit> > xnor_clause = xnor2_clause(PO_vars,var_int);
+			vector<vector<Lit> > xor_clause = xor2_clause(PO_vars,var_int);
 
 			vector<vector<Lit> > clauses;
 			clauses.insert(clauses.end(),spec_clause.begin(),spec_clause.end());
 			clauses.insert(clauses.end(),imp_clause.begin(),imp_clause.end());
-			clauses.insert(clauses.end(),xnor_clause.begin(),xnor_clause.end());
+			clauses.insert(clauses.end(),xor_clause.begin(),xor_clause.end());
 
 			Solver S;
 
@@ -418,14 +422,15 @@ int main(int argc, char **argv) {
 			    S.addClause(newVec);
 			}
 			if (!S.simplify()) {
-				is_equal == false;
-			} else {
 				is_equal == true;
+			} else {
+				is_equal == false;
 			}
 			if (!S.solve()) {
-				is_equal == false;
-			} else {
 				is_equal == true;
+				cout << "The PO:" << PO_map_it->first->getName() << " is equal" << endl;
+			} else {
+				is_equal == false;
 			}
 		}
 		// If a PO is not equal we should print it here
