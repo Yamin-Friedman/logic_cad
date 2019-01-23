@@ -94,7 +94,7 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
 	vector<int> in_vars;
     map<string, hcmInstPort* > InstPorts_gate = gate->getInstPorts();
     map<string,hcmInstPort*>::iterator g_iter;
-    for (g_iter=InstPorts.begin();g_iter!=InstPorts.end();g_iter++){ //go over node's instPorts
+    for (g_iter=InstPorts_gate.begin();g_iter!=InstPorts_gate.end();g_iter++){ //go over node's instPorts
         hcmPort *port= (*g_iter).second->getPort();
         //cout<<"dir is: "<<port->getDirection()<<"and name is: "<<port->getName()<<endl;
         if(port!=NULL && port->getDirection()==IN){
@@ -115,7 +115,6 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
     int gate_var;
     gate->getProp("sat var",gate_var);
 	string name = gate->masterCell()->getName();
-
 
 	if(in_vars.size()==0) {
 		cout<<" handle!"<<endl;
@@ -289,11 +288,8 @@ int main(int argc, char **argv) {
 				//cout<<"found FF: "<<node->getName()<<" and it's friend: "<<imp_node->getName()<<endl;
 				PO_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
 				node->setProp("sat var",var_int);
-				vector<vector<Lit> > clause;
-				clause.push_back(vector<Lit>(var_int));
-				node->setProp("clauses",clause);
+				var_int++;
 				imp_node->setProp("sat var",var_int);
-				imp_node->setProp("clauses",clause);
 				var_int++;
 			}
 			else if((*port_itr).second->getPort()->getDirection()==OUT){
@@ -301,7 +297,7 @@ int main(int argc, char **argv) {
 				PI_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
 				node->setProp("sat var",var_int);
 				vector<vector<Lit> > clause;
-				clause.push_back(vector<Lit>(var_int));
+				clause.push_back(vector<Lit>(1,mkLit(var_int)));
 				node->setProp("clauses",clause);
 				imp_node->setProp("sat var",var_int);
 				imp_node->setProp("clauses",clause);
@@ -325,11 +321,13 @@ int main(int argc, char **argv) {
 			hcmNode *imp_node = imp_cell_flat->getNode(spec_node->getName());
 			PI_map.insert(pair<hcmNode*,hcmNode*>(spec_node,imp_node));
 			spec_node->setProp("sat var",var_int);
-			vector<vector<int> > clause;
-			clause.push_back(vector<int>(1,var_int));
-			spec_node->setProp("clauses",clause);
+			vector<vector<Lit> > clause;
+			clause.push_back(vector<Lit>(1,mkLit(var_int)));
+			int res = spec_node->setProp("clauses",clause);
 			imp_node->setProp("sat var",var_int);
 			imp_node->setProp("clauses",clause);
+	        vector<vector<Lit> > clause_tmp;
+	        spec_node->getProp("clauses", clause_tmp);
 			var_int++;
 
 		//if this is a true top output node:
@@ -337,14 +335,8 @@ int main(int argc, char **argv) {
 			hcmNode *imp_node = imp_cell_flat->getNode(spec_node->getName());
 			PO_map.insert(pair<hcmNode*,hcmNode*>(spec_node,imp_node));
 			spec_node->setProp("sat var",var_int);
-			imp_node->setProp("sat var",var_int);
-			vector<vector<int> > clause;
-			clause.push_back(vector<int>(1,var_int));
-			spec_node->setProp("clauses",clause);
 			var_int++;
-			clause[0] = vector<int>(1,var_int);
 			imp_node->setProp("sat var",var_int);
-			imp_node->setProp("clauses",clause);
 			var_int++;
 		} else {
 			spec_node->setProp("sat var",var_int);
