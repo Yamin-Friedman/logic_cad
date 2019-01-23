@@ -71,7 +71,6 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
 	bool is_PI = false;
 	node->getProp("PI",is_PI);
 	if (is_PI) {
-		cout << "reached PI:" << node->getName() << endl;
 		return clauses;
 	}
 	// This is a recursion breaking condition of having reached a node that we already know the clauses for. This can be
@@ -79,15 +78,12 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
 	vector<vector<Lit> > temp_clauses;
 	res = node->getProp("clauses",temp_clauses);
 	if (res == OK) {
-		cout << "Already calced node" << node->getName() << endl;
-		cout << "size of clauses:" << temp_clauses.size() << endl;
 		for (int i = 0 ; i < temp_clauses.size(); i++) {
-			cout << "size of clause:" << temp_clauses[i].size() << endl;
 		}
 		return temp_clauses;
 	}
 
-	cout << "enter get node clauses node name:" << node->getName() << endl;
+//	cout << "enter get node clauses node name:" << node->getName() << endl;
 	//Find gate pushing the node (only one)
 	bool undriven=true;
     map<string, hcmInstPort* > InstPorts = node->getInstPorts();
@@ -131,7 +127,7 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
     //calculate this gate's clause, with the input vars collected from nodes:
     vector<vector<Lit> > curr_clause;
     int gate_var;
-    gate->getProp("sat var",gate_var);
+    node->getProp("sat var",gate_var);
 	string name = gate->masterCell()->getName();
 	node_vec.push_back(node);
 
@@ -209,6 +205,10 @@ int main(int argc, char **argv) {
 	vector<string> imp_vlgFiles;
 	string spec_top_cell_name;
 	string imp_top_cell_name;
+
+//	for (int j = 0; j < 100; j++){
+//		cout << "int:" << j << "Lit" << mkLit(j).x << "~LIT:" << (~mkLit(j)).x << endl;
+//	}
 
 
 	parse_input(argc,argv,&spec_vlgFiles,&imp_vlgFiles,&spec_top_cell_name,&imp_top_cell_name);
@@ -384,6 +384,8 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	cout << "max var_int" << var_int << endl;
+
 
 	// Loop over all the POs in the spec and imp, build clauses for them and compare with sat solver
 	spec_cell_flat->createNode("dummy");
@@ -424,7 +426,6 @@ int main(int argc, char **argv) {
 				is_equal = false;
 			}
 		} else {
-			cout << "enter solver for output node:" << PO_map_it->first->getName() << endl;
 			Solver S;
 
 			S.verbosity = false;
@@ -435,12 +436,16 @@ int main(int argc, char **argv) {
 				vector<Lit> original = clauses[i];
 				vec<Lit> newVec;
 				for (int j = 0; j < original.size(); j++) {
-					cout << "before push" << endl;
-					Lit p;
-					p.x = original[j].x;
-					newVec.push(mkLit(j));
+					int p;
+					if ( original[j].x % 2 == 1) {
+						p = (original[j].x - 1) / 2;
+						newVec.push(~mkLit(p));
+					}
+					else {
+						p = original[j].x / 2;
+						newVec.push(mkLit(p));
+					}
 				}
-				cout << "before add clause" << endl;
 				S.addClause(newVec);
 			}
 
@@ -456,7 +461,7 @@ int main(int argc, char **argv) {
 		if (!is_equal) {
 			overall_equal=false;
 			cout << "There is a mismatch between the output of the spec and the output of the implementation for the output node: " << PO_map_it->first->getName() << endl;
-//			exit(-1);
+			exit(-1);
 		}
 
 	}
