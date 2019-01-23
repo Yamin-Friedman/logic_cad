@@ -399,9 +399,11 @@ int main(int argc, char **argv) {
 
 		// sat solver
 		vector<int> PO_vars;
+		PO_vars.clear();
 		int var;
 
 		vector<hcmNode*> node_vec;
+		node_vec.clear();
 		node_vec.push_back(PO_map_it->first);
 		node_vec.push_back(PO_map_it->second);
 		node_vec.push_back(spec_cell_flat->getNode("dummy"));
@@ -413,6 +415,7 @@ int main(int argc, char **argv) {
 		vector<vector<Lit> > xor_clause = xor2_clause(PO_vars,var_int,node_vec);
 
 		vector<vector<Lit> > clauses;
+		clauses.clear();
 		clauses.insert(clauses.end(),spec_clause.begin(),spec_clause.end());
 		clauses.insert(clauses.end(),imp_clause.begin(),imp_clause.end());
 		clauses.insert(clauses.end(),xor_clause.begin(),xor_clause.end());
@@ -429,7 +432,7 @@ int main(int argc, char **argv) {
 			Solver S;
 
 			S.verbosity = false;
-			for (int i = 0; i < var_int; i++) {
+			for (int i = 0; i < var_int + 1; i++) {
 				S.newVar();
 			}
 			for (int i = 0; i < clauses.size(); i++) {
@@ -449,7 +452,9 @@ int main(int argc, char **argv) {
 				S.addClause(newVec);
 			}
 
+			S.addClause(mkLit(var_int));
 
+			cout << "before solve" << endl;
 			if (!S.solve()) {
 				is_equal = true;
 				cout << "The PO:" << PO_map_it->first->getName() << " is equal" << endl;

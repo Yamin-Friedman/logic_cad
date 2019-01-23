@@ -184,13 +184,13 @@ vector<vector<Lit> > xnor2_clause(vector<int> input_var, int output_var, vector<
 		return not_clause(input_var[1],output_var,new_vec);
 	} else {
 		vector<Lit> first_clause;
-		first_clause.push_back(~mkLit(output_var));
-		first_clause.push_back( mkLit(input_var[0]));
-		first_clause.push_back(~mkLit(input_var[1]));
+		first_clause.push_back(mkLit(output_var));
+		first_clause.push_back(mkLit(input_var[0]));
+		first_clause.push_back(mkLit(input_var[1]));
 		vector<Lit> sec_clause;
-		sec_clause.push_back(~mkLit(output_var));
+		sec_clause.push_back(mkLit(output_var));
 		sec_clause.push_back(~mkLit(input_var[0]));
-		sec_clause.push_back(mkLit(input_var[1]));
+		sec_clause.push_back(~mkLit(input_var[1]));
 		vector<vector<Lit> > clauses;
 		clauses.push_back(first_clause);
 		clauses.push_back(sec_clause);
