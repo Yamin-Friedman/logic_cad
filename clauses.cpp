@@ -161,6 +161,8 @@ vector<vector<Lit> > nor_clause(vector<int> input_var, int output_var, vector<hc
 			clause.push_back(~mkLit(input_var[i]));
 			clauses.push_back(clause);
 		}
+
+		constant = -1;
 	}
 
 	clauses.push_back(sum_clause);

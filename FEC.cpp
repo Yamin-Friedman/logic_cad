@@ -422,7 +422,7 @@ int main(int argc, char **argv) {
 				vector<Lit> original = clauses[i];
 				vec<Lit> newVec(original.size());
 				for (int j = 0; j < original.size(); j++) {
-					newVec[i] = original[i];
+					newVec[j] = original[j];
 				}
 				S.addClause(newVec);
 			}
@@ -444,6 +444,7 @@ int main(int argc, char **argv) {
 		if (!is_equal) {
 			overall_equal=false;
 			cout << "There is a mismatch between the output of the spec and the output of the implementation for the output node: " << PO_map_it->first->getName() << endl;
+			exit(-1);
 		}
 
 	}
