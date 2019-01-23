@@ -218,7 +218,7 @@ int main(int argc, char **argv) {
 	int var_int = 0;
 
 
-    // go over all instances in circuit and find FF:
+    // go over all instances in circuit and find FF, add to PO,PI maps:
 
     map<string,hcmInstance*> allInst = spec_cell_flat->getInstances();
     map<string,hcmInstance*>::iterator all_itr=allInst.begin();
@@ -242,7 +242,7 @@ int main(int argc, char **argv) {
 					imp_node->setProp("sat var",var_int);
 					var_int++;
 				}
-				else if((*port_itr).second->getPort()->getDirection()==OUT && node->getName().find("CLK")==string::npos){
+				else if((*port_itr).second->getPort()->getDirection()==OUT){
 					hcmNode *imp_node = imp_cell_flat->getNode(node->getName());
 					PI_map.insert(pair<hcmNode*,hcmNode*>(node,imp_node));
 					node->setProp("sat var",var_int);
@@ -386,7 +386,6 @@ int main(int argc, char **argv) {
 				vector<Lit> original = clauses[i];
 				vec<Lit> newVec;
 				for (int j = 0; j < original.size(); j++) {
-					cout << "original x:" << original[j].x << endl;
 					int p;
 					if ( original[j].x % 2 == 1) {
 						p = (original[j].x - 1) / 2;
@@ -396,9 +395,7 @@ int main(int argc, char **argv) {
 						p = original[j].x / 2;
 						newVec.push(mkLit(p));
 					}
-					//cout<<p<<endl;
 				}
-				cout << "new clause" << endl;
 				S.addClause(newVec);
 			}
 
@@ -420,7 +417,6 @@ int main(int argc, char **argv) {
 
 	}
 	if(overall_equal) cout<<"The files match!"<<endl;
-	else cout<<"The files do not match!"<<endl;
 
 }
 
