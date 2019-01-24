@@ -61,8 +61,7 @@ vector<vector<Lit> > get_node_clauses(hcmNode* node) {
         }
     }
     if(undriven){
-	    cout << "node name:" << node->getName() << endl;
-    	cout<<"error: node is undriven. exiting"<<endl;
+    	cout<<"error: node " << node->getName() << " is undriven. exiting"<<endl;
     	exit(-1);
     }
 
@@ -380,7 +379,7 @@ int main(int argc, char **argv) {
 				S.newVar();
 			}
 
-			// This switches all the vectors to vecs. We found this to be neccessary because it doesn't seem that vecs
+			// This switches all the vectors to vecs. We found this to be necessary because it doesn't seem that vecs
 			// have copy constructors.
 			for (int i = 0; i < clauses.size(); i++) {
 				vector<Lit> original = clauses[i];
@@ -412,7 +411,6 @@ int main(int argc, char **argv) {
 		if (!is_equal) {
 			overall_equal=false;
 			cout << "There is a mismatch between the output of the spec and the output of the implementation for the output node: " << PO_map_it->first->getName() << endl;
-			exit(-1);
 		}
 
 	}

@@ -10,10 +10,10 @@ vector<vector<Lit> > buffer_clause(int input_var, int output_var, vector<hcmNode
 	int constant = -1;
 	node_vec[0]->getProp("constant",constant);
 
-	if (constant != -1 && constant == 0) {
+	if (constant == 0) {
 		clauses.push_back(vector<Lit>(1,~mkLit(output_var)));
 		node_vec[1]->setProp("constant",0);
-	} else if (input_var != -1 && constant == 1) {
+	} else if (constant == 1) {
 		clauses.push_back(vector<Lit>(1,mkLit(1)));
 		node_vec[1]->setProp("constant",1);
 	} else {
@@ -36,10 +36,10 @@ vector<vector<Lit> > not_clause(int input_var, int output_var, vector<hcmNode*> 
 	int constant = -1;
 	node_vec[0]->getProp("constant",constant);
 
-	if (constant != -1 && constant == 0) {
+	if (constant == 0) {
 		clauses.push_back(vector<Lit>(1,mkLit(output_var)));
 		node_vec[1]->setProp("constant",1);
-	} else if (input_var != -1 && constant == 1) {
+	} else if (constant == 1) {
 		clauses.push_back(vector<Lit>(1,~mkLit(1)));
 		node_vec[1]->setProp("constant",0);
 	} else {
@@ -65,10 +65,10 @@ vector<vector<Lit> > and_clause(vector<int> input_var, int output_var, vector<hc
 	for (int i = 0; i < input_var.size(); i++) {
 		node_vec[i]->getProp("constant",constant);
 
-		if (constant != -1 && constant == 0) {
+		if (constant == 0) {
 			node_vec[node_vec.size() - 1]->setProp("constant",0);
 			return vector<vector<Lit> >(1,vector<Lit>(1,~mkLit(output_var)));
-		} else if (constant != -1 && constant == 1) {
+		} else if (constant == 1) {
 			continue;
 		} else {
 			sum_clause.push_back(~mkLit(input_var[i]));
@@ -95,10 +95,10 @@ vector<vector<Lit> > nand_clause(vector<int> input_var, int output_var, vector<h
 	for (int i = 0; i < input_var.size(); i++) {
 		node_vec[i]->getProp("constant",constant);
 
-		if (constant != -1 && constant == 0) {
+		if (constant == 0) {
 			node_vec[node_vec.size() - 1]->setProp("constant",1);
 			return vector<vector<Lit> >(1,vector<Lit>(1,mkLit(output_var)));
-		} else if (constant != -1 && constant == 1) {
+		} else if (constant == 1) {
 			continue;
 		} else {
 			sum_clause.push_back(~mkLit(input_var[i]));
@@ -125,10 +125,10 @@ vector<vector<Lit> > or_clause(vector<int> input_var, int output_var, vector<hcm
 	for (int i = 0; i < input_var.size(); i++) {
 		node_vec[i]->getProp("constant",constant);
 
-		if (constant != -1 && constant == 1) {
+		if (constant == 1) {
 			node_vec[node_vec.size() - 1]->setProp("constant",1);
 			return vector<vector<Lit> >(1,vector<Lit>(1,mkLit(output_var)));
-		} else if (constant != -1 && constant == 0) {
+		} else if (constant == 0) {
 			continue;
 		} else {
 			sum_clause.push_back(mkLit(input_var[i]));
@@ -155,10 +155,10 @@ vector<vector<Lit> > nor_clause(vector<int> input_var, int output_var, vector<hc
 	for (int i = 0; i < input_var.size(); i++) {
 		node_vec[i]->getProp("constant",constant);
 
-		if (constant != -1 && constant == 1) {
+		if ( constant == 1) {
 			node_vec[node_vec.size() - 1]->setProp("constant",0);
 			return vector<vector<Lit> >(1,vector<Lit>(1,~mkLit(output_var)));
-		} else if (constant != -1 && constant == 1) {
+		} else if (constant == 1) {
 			continue;
 		} else {
 			sum_clause.push_back(mkLit(input_var[i]));
@@ -181,11 +181,11 @@ vector<vector<Lit> > xnor2_clause(vector<int> input_var, int output_var, vector<
 	int constant = -1;
 	node_vec[0]->getProp("constant",constant);
 
-	if (constant != -1 && constant == 1) {
+	if (constant == 1) {
 		vector<hcmNode*> new_vec;
 		new_vec.insert(node_vec.begin() + 1,node_vec.end(),new_vec.end());
 		return buffer_clause(input_var[1],output_var,new_vec);
-	} else if (constant != -1 && constant == 0) {
+	} else if (constant == 0) {
 		vector<hcmNode*> new_vec;
 		new_vec.insert(new_vec.end(),node_vec.begin() + 1,node_vec.end());
 		return not_clause(input_var[1],output_var,new_vec);
@@ -220,11 +220,11 @@ vector<vector<Lit> > xor2_clause(vector<int> input_var, int output_var, vector<h
 	int constant = -1;
 	node_vec[0]->getProp("constant",constant);
 
-	if (constant != -1 && constant == 1) {
+	if (constant == 1) {
 		vector<hcmNode*> new_vec;
 		new_vec.insert(node_vec.begin() + 1,node_vec.end(),new_vec.end());
 		return not_clause(input_var[1],output_var,new_vec);
-	} else if (constant != -1 && constant == 0) {
+	} else if (constant == 0) {
 		vector<hcmNode*> new_vec;
 		new_vec.insert(new_vec.end(),node_vec.begin() + 1,node_vec.end());
 		return buffer_clause(input_var[1],output_var,new_vec);
